@@ -1,6 +1,7 @@
 import os
 import discord
 from discord.ext import commands
+from discord import app_commands
 import asyncio
 
 intents = discord.Intents.default()
@@ -29,7 +30,7 @@ class VerificationView(discord.ui.View):
             await interaction.user.add_roles(role)
             await interaction.response.send_message("✅ Pomyślnie zweryfikowano konto! Witaj na serwerze.", ephemeral=True)
 
-# --- 2. ZAMYKANIE TICKETA ---
+# --- ZAMYKANIE TICKETA ---
 class CloseTicketView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -43,7 +44,7 @@ class CloseTicketView(discord.ui.View):
         except Exception as e:
             print(f"❌ BŁĄD USUWANIA KANAŁU: {e}")
 
-# --- 3. TICKETY I KATEGORIE ---
+# --- 2. TICKETY I KATEGORIE ---
 class TicketView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -52,7 +53,6 @@ class TicketView(discord.ui.View):
         guild = interaction.guild
         member = interaction.user
 
-        # Nowe, zaktualizowane ID kategorii
         category_ids = {
             "owner": 1556300080355606608,
             "shop": 1556300130892906506,
@@ -98,7 +98,6 @@ class TicketView(discord.ui.View):
             await interaction.response.send_message(f"Masz już otwarty ticket: {existing_channel.mention}", ephemeral=True)
             return
 
-        # Pobieranie kategorii bezpośrednio przez API Discorda po ID
         category = None
         cat_id = category_ids.get(ticket_type)
         if cat_id:
@@ -144,9 +143,14 @@ async def on_ready():
     bot.add_view(VerificationView())
     bot.add_view(TicketView())
     bot.add_view(CloseTicketView())
+    try:
+        synced = await bot.tree.sync()
+        print(f'Zsynchronizowano {len(synced)} komend slash.')
+    except Exception as e:
+        print(e)
     print(f"Zalogowano jako {bot.user}!")
 
-# --- 4. AUTOMATYCZNE POWITANIA ---
+# --- 3. AUTOMATYCZNE POWITANIA ---
 @bot.event
 async def on_member_join(member):
     channel = discord.utils.get(member.guild.text_channels, name="wlc")
@@ -170,24 +174,45 @@ async def on_member_join(member):
 
         await channel.send(embed=embed)
 
-# --- 5. KOMENDA !SAY ---
+# --- 4. KOMENDA !SAY ---
 @bot.command()
 async def say(ctx, *, wiadomosc: str):
     await ctx.message.delete()
     await ctx.send(wiadomosc)
 
-# --- 6. NOWA KOMENDA !ADD ---
-@bot.command(name="add")
-async def add_user(ctx, member: discord.Member):
-    # Sprawdzamy czy kanał to ticket (nazwa zawiera "ticket")
-    if "ticket" in ctx.channel.name.lower():
-        # Nadajemy uprawnienia użytkownikowi do widzenia i pisania na tym kanale
-        await ctx.channel.set_permissions(member, read_messages=True, send_messages=True)
+# --- ZARZĄDZANIE TICKETAMI (!add / !remove) ---
+@bot.command()
+async def add(ctx, member: discord.Member):
+    if isinstance(ctx.channel, discord.TextChannel):
+        await ctx.channel.set_permissions(member, view_channel=True, send_messages=True)
         await ctx.send(f"✅ Pomyślnie dodano użytkownika {member.mention} do tego ticketa!")
     else:
-        await ctx.send("❌ Tej komendy można używać tylko na kanałach biletów (ticketach)!")
+        await ctx.send("❌ Tej komendy można używać tylko na serwerze.")
 
-# --- 7. KOMENDY SETUPUJĄCE ---
+@bot.command()
+async def remove(ctx, member: discord.Member):
+    if isinstance(ctx.channel, discord.TextChannel):
+        await ctx.channel.set_permissions(member, overwrite=None)
+        await ctx.send(f"✅ Pomyślnie usunięto użytkownika {member.mention} z tego ticketa!")
+    else:
+        await ctx.send("❌ Tej komendy można używać tylko na serwerze.")
+
+# --- KOMENDA /UNBAN ---
+@bot.tree.command(name="unban", description="Odbiera bana użytkownikowi na serwerze po jego ID")
+@app_commands.describe(user_id="ID użytkownika, którego chcesz odbanować")
+async def unban(interaction: discord.Interaction, user_id: str):
+    if not interaction.user.guild_permissions.ban_members:
+        await interaction.response.send_message("❌ Nie masz uprawnień do używania tej komendy!", ephemeral=True)
+        return
+
+    try:
+        user = await bot.fetch_user(int(user_id))
+        await interaction.guild.unban(user)
+        await interaction.response.send_message(f"✅ Pomyślnie odbisno bana użytkownikowi {user.mention}!", ephemeral=True)
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Wystąpił błąd. Upewnij się, że podajesz poprawne ID użytkownika.", ephemeral=True)
+
+# --- KOMENDY SETUPUJĄCE PANELE ---
 @bot.command()
 async def setup_weryfikacja(ctx):
     embed = discord.Embed(
@@ -207,4 +232,5 @@ async def setup_tickets(ctx):
     await ctx.send(embed=embed, view=TicketView())
 
 # --- URUCHOMIENIE BOTA ---
-bot.run(os.getenv("DISCORD_TOKEN"))
+TOKEN = os.getenv("DISCORD_TOKEN")
+bot.run(TOKEN)
