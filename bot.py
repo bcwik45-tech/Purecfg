@@ -63,7 +63,7 @@ class TicketView(discord.ui.View):
             "shop": 1556300130892906506,
             "support": 1556300180624769105,
             "recruitment": 1556300236526329936,
-            "partner": 1556300290000000000  # Możesz podmienić na właściwe ID kategorii partnerów
+            "partner": 1556383124424892606  # Tutaj możesz ewentualnie podmienić ID kategorii na serwerze
         }
 
         overwrites = {
