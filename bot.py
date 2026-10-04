@@ -62,7 +62,8 @@ class TicketView(discord.ui.View):
             "owner": 1556300080355606608,
             "shop": 1556300130892906506,
             "support": 1556300180624769105,
-            "recruitment": 1556300236526329936
+            "recruitment": 1556300236526329936,
+            "partner": 1556300290000000000  # Możesz podmienić na właściwe ID kategorii partnerów
         }
 
         overwrites = {
@@ -88,6 +89,10 @@ class TicketView(discord.ui.View):
             allowed_roles = ["Owner", "Co-Owner", "Staff", "Head Staff"]
             title_text = "📄 Recruitment Ticket"
             desc_text = "Hello! Welcome to Recruitment.\n**Please provide your application details** and wait for the review.\n\nTo close the ticket, click the button below."
+        elif ticket_type == "partner":
+            allowed_roles = ["Owner", "Co-Owner", "Staff", "Head Staff"]
+            title_text = "🤝 Partner Ticket"
+            desc_text = "Hello! Welcome to Partnership.\n**Please send your server invite and details** and wait for administration.\n\nTo close the ticket, click the button below."
 
         role_mentions = []
         for r_name in allowed_roles:
@@ -142,6 +147,10 @@ class TicketView(discord.ui.View):
     @discord.ui.button(label="Recruitment", style=discord.ButtonStyle.red, emoji="📄", custom_id="ticket_recruitment")
     async def recruitment_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.create_ticket(interaction, "recruitment")
+
+    @discord.ui.button(label="Partner", style=discord.ButtonStyle.blurple, emoji="🤝", custom_id="ticket_partner")
+    async def partner_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.create_ticket(interaction, "partner")
 
 @bot.event
 async def on_ready():
