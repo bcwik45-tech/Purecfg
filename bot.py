@@ -1,7 +1,7 @@
+import os
 import discord
 from discord.ext import commands
 import asyncio
-import os
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -176,7 +176,18 @@ async def say(ctx, *, wiadomosc: str):
     await ctx.message.delete()
     await ctx.send(wiadomosc)
 
-# --- 6. KOMENDY SETUPUJĄCE ---
+# --- 6. NOWA KOMENDA !ADD ---
+@bot.command(name="add")
+async def add_user(ctx, member: discord.Member):
+    # Sprawdzamy czy kanał to ticket (nazwa zawiera "ticket")
+    if "ticket" in ctx.channel.name.lower():
+        # Nadajemy uprawnienia użytkownikowi do widzenia i pisania na tym kanale
+        await ctx.channel.set_permissions(member, read_messages=True, send_messages=True)
+        await ctx.send(f"✅ Pomyślnie dodano użytkownika {member.mention} do tego ticketa!")
+    else:
+        await ctx.send("❌ Tej komendy można używać tylko na kanałach biletów (ticketach)!")
+
+# --- 7. KOMENDY SETUPUJĄCE ---
 @bot.command()
 async def setup_weryfikacja(ctx):
     embed = discord.Embed(
