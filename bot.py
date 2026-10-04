@@ -17,18 +17,23 @@ class VerificationView(discord.ui.View):
 
     @discord.ui.button(label="Verify", style=discord.ButtonStyle.green, custom_id="verify_button")
     async def verify_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True)
+        
         role_name = ".gg/purecfg"
         role = discord.utils.get(interaction.guild.roles, name=role_name)
 
         if not role:
-            await interaction.response.send_message(f"Błąd: Nie znaleziono roli '{role_name}' na serwerze!", ephemeral=True)
+            await interaction.followup.send(f"❌ Błąd: Nie znaleziono roli '{role_name}' na serwerze!", ephemeral=True)
             return
 
         if role in interaction.user.roles:
-            await interaction.response.send_message("Masz już zweryfikowane konto!", ephemeral=True)
+            await interaction.followup.send("⚠️ Masz już zweryfikowane konto!", ephemeral=True)
         else:
-            await interaction.user.add_roles(role)
-            await interaction.response.send_message("✅ Pomyślnie zweryfikowano konto! Witaj na serwerze.", ephemeral=True)
+            try:
+                await interaction.user.add_roles(role)
+                await interaction.followup.send("✅ Pomyślnie zweryfikowano konto! Witaj na serwerze.", ephemeral=True)
+            except Exception as e:
+                await interaction.followup.send(f"❌ Wystąpił błąd podczas nadawania roli: {e}", ephemeral=True)
 
 # --- ZAMYKANIE TICKETA ---
 class CloseTicketView(discord.ui.View):
@@ -95,7 +100,7 @@ class TicketView(discord.ui.View):
         existing_channel = discord.utils.get(guild.text_channels, name=channel_name)
 
         if existing_channel:
-            await interaction.response.send_message(f"Masz już otwarty ticket: {existing_channel.mention}", ephemeral=True)
+            await interaction.response.send_message(f"⚠️ Masz już otwarty ticket: {existing_channel.mention}", ephemeral=True)
             return
 
         category = None
@@ -197,7 +202,20 @@ async def remove(ctx, member: discord.Member):
     else:
         await ctx.send("❌ Tej komendy można używać tylko na serwerze.")
 
-# --- KOMENDA /UNBAN ---
+# --- KOMENDY SLASH (/BAN oraz /UNBAN) ---
+@bot.tree.command(name="ban", description="Banuje użytkownika na serwerze")
+@app_commands.describe(member="Użytkownik, którego chcesz zbanować", reason="Powód bana (opcjonalnie)")
+async def ban(interaction: discord.Interaction, member: discord.Member, reason: str = "Brak powodu"):
+    if not interaction.user.guild_permissions.ban_members:
+        await interaction.response.send_message("❌ Nie masz uprawnień do używania tej komendy!", ephemeral=True)
+        return
+
+    try:
+        await member.ban(reason=reason)
+        await interaction.response.send_message(f"✅ Pomyślnie zbanowano użytkownika {member.mention}. Powód: {reason}", ephemeral=True)
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Wystąpił błąd podczas próby zbanowania użytkownika.", ephemeral=True)
+
 @bot.tree.command(name="unban", description="Odbiera bana użytkownikowi na serwerze po jego ID")
 @app_commands.describe(user_id="ID użytkownika, którego chcesz odbanować")
 async def unban(interaction: discord.Interaction, user_id: str):
