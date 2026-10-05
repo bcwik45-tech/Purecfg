@@ -59,11 +59,9 @@ class TicketView(discord.ui.View):
         }
         
         category = None
-        # Jeśli podano konkretne ID kategorii, użyj go
         if category_id:
             category = guild.get_channel(category_id)
         
-        # Jeśli nie znaleziono po ID, szukaj po nazwie
         if not category:
             for cat in guild.categories:
                 if ticket_type.lower() in cat.name.lower() or ticket_type in cat.name.lower():
@@ -107,7 +105,6 @@ class TicketView(discord.ui.View):
 
     @discord.ui.button(label="Shop 🛒", style=discord.ButtonStyle.green, custom_id="ticket_shop")
     async def shop_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # Użycie dedykowanego ID kategorii dla sklepu: 1556300130892906506
         await self.create_ticket_channel(interaction, "shop", "🛒", "Shop Ticket", "Hello! Welcome to the Shop.\n**What would you like to buy today?** Please specify your order and wait for the staff.\n\nTo close the ticket, click the button below.", category_id=1556300130892906506)
 
     @discord.ui.button(label="Owner 👑", style=discord.ButtonStyle.secondary, custom_id="ticket_owner")
@@ -232,11 +229,9 @@ async def setup_partner(interaction: discord.Interaction):
     await interaction.channel.send(embed=embed, view=PartnerView())
     await interaction.response.send_message("✅ Wysłano panel partnerstw!", ephemeral=True)
 
-# Komenda /add do dodawania użytkowników do ticketa
 @bot.tree.command(name="add", description="Dodaje użytkownika do aktywnego ticketa")
 @app_commands.describe(member="Użytkownik, którego chcesz dodać")
 async def add_user(interaction: discord.Interaction, member: discord.Member):
-    # Sprawdzenie czy kanał to ticket (zaczyna się od emotki)
     if not any(interaction.channel.name.startswith(e) for e in ["🛒", "👑", "❓", "📄", "🤝"]):
         await interaction.response.send_message("❌ Tej komendy można używać tylko w kanałach ticketów!", ephemeral=True)
         return
@@ -247,5 +242,45 @@ async def add_user(interaction: discord.Interaction, member: discord.Member):
     except Exception as e:
         await interaction.response.send_message(f"❌ Wystąpił błąd: {e}", ephemeral=True)
 
-# Komenda /remove do usuwania użytkowników z ticketa
-@bot.tree.
+@bot.tree.command(name="remove", description="Usuwa użytkownika z aktywnego ticketa")
+@app_commands.describe(member="Użytkownik, którego chcesz usunąć")
+async def remove_user(interaction: discord.Interaction, member: discord.Member):
+    if not any(interaction.channel.name.startswith(e) for e in ["🛒", "👑", "❓", "📄", "🤝"]):
+        await interaction.response.send_message("❌ Tej komendy można używać tylko w kanałach ticketów!", ephemeral=True)
+        return
+
+    try:
+        await interaction.channel.set_permissions(member, overwrite=None)
+        await interaction.response.send_message(f"✅ Usunięto użytkownika {member.mention} z ticketa.")
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Wystąpił błąd: {e}", ephemeral=True)
+
+@bot.tree.command(name="minigame", description="Rozpocznij minigrę")
+async def minigame(interaction: discord.Interaction):
+    if interaction.channel.name != "minigame":
+        await interaction.response.send_message("❌ Tej komendy można używać tylko na kanale #minigame!", ephemeral=True)
+        return
+    await interaction.response.send_message("🎮 Rozpoczęto minigrę! Powodzenia!")
+
+@bot.tree.command(name="wzor_staff", description="Wyświetla wzór podania na staff")
+async def wzor_staff(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="📝 Rekrutacja na Staff - Wzór",
+        description="Skopiuj poniższy wzór i wyślij go w odpowiednim kanale.",
+        color=discord.Color.blue()
+    )
+    embed.add_field(name="1. Wiek:", value="[Wpisz tutaj]", inline=False)
+    embed.add_field(name="2. Klipy/HL:", value="[Wpisz tutaj]", inline=False)
+    embed.add_field(name="3. Aktywność:", value="[Wpisz tutaj]", inline=False)
+    await interaction.response.send_message(embed=embed)
+
+@bot.tree.command(name="accept", description="Akceptuje kandydata i nadaje rangę Pure")
+@app_commands.describe(member="Użytkownik, którego chcesz zaakceptować")
+async def accept(interaction: discord.Interaction, member: discord.Member):
+    if not interaction.user.guild_permissions.manage_roles:
+        await interaction.response.send_message("❌ Nie masz uprawnień.", ephemeral=True)
+        return
+
+    role = interaction.guild.get_role(1540359963346608168)
+    if not role:
+        await interaction.response.send_message("❌ Nie znaleziono roli Pure (ID: 15403599633466081
