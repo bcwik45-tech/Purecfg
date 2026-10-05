@@ -275,8 +275,8 @@ async def minigame(interaction: discord.Interaction):
         try:
             await interaction.user.add_roles(role)
             embed = discord.Embed(
-                title="🏆 You win!",
-                description=f"🎉 {interaction.user.mention} trafił szczęśliwy los (1/50) i wygrał rangу **.boosterzone**!",
+                title="🏆 You win",
+                description=f"🎉 {interaction.user.mention} trafił szczęśliwy los (1/50) i wygrał rangę **.boosterzone**!",
                 color=discord.Color.green()
             )
             embed.set_thumbnail(url=interaction.user.display_avatar.url)
@@ -286,11 +286,11 @@ async def minigame(interaction: discord.Interaction):
     else:
         embed = discord.Embed(
             title="❌ You lost",
-            description=f"😢 Niestety tym razem się nie udało! Spróbuj ponownie jutro.",
+            description=f"😢 {interaction.user.mention}, niestety tym razem się nie udało! Spróbuj ponownie jutro.",
             color=discord.Color.red()
         )
         embed.set_thumbnail(url=interaction.user.display_avatar.url)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.send_message(embed=embed)
 
 @minigame.error
 async def minigame_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
