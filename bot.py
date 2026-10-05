@@ -18,7 +18,6 @@ class CloseTicketView(discord.ui.View):
         await interaction.response.defer(ephemeral=True)
         channel = interaction.channel
         
-        # Generowanie transcriptu (historii wiadomości)
         messages_history = []
         async for msg in channel.history(limit=500, oldest_first=True):
             timestamp = msg.created_at.strftime('%Y-%m-%d %H:%M')
@@ -27,7 +26,6 @@ class CloseTicketView(discord.ui.View):
         transcript_text = f"Transcript z ticketa: {channel.name}\n" + "\n".join(messages_history)
         file = discord.File(io.BytesIO(transcript_text.encode('utf-8')), filename=f"transcript-{channel.name}.txt")
         
-        # Próba wysłania transcriptu na PW użytkownika
         try:
             await interaction.user.send("Oto transcript z Twojego zamkniętego ticketa:", file=file)
         except Exception:
@@ -187,7 +185,7 @@ bot = PurecfgBot()
 async def on_ready():
     print(f"Zalogowano jako {bot.user} (ID: {bot.user.id})")
 
-@bot.tree.command(name="setup_verify", description="Wysyła panel weryfikacji")
+@bot.tree.command(name="setup_verify", description="Send verification panel")
 async def setup_verify(interaction: discord.Interaction):
     if not interaction.user.guild_permissions.administrator:
         await interaction.response.send_message("❌ Brak uprawnień!", ephemeral=True)
@@ -201,58 +199,7 @@ async def setup_verify(interaction: discord.Interaction):
     await interaction.channel.send(embed=embed, view=VerifyView())
     await interaction.response.send_message("✅ Wysłano panel weryfikacji!", ephemeral=True)
 
-@bot.tree.command(name="setup_ticket", description="Wysyła oficjalny panel ticketów")
+@bot.tree.command(name="setup_ticket", description="Send ticket panel")
 async def setup_ticket(interaction: discord.Interaction):
     if not interaction.user.guild_permissions.administrator:
-        await interaction.response.send_message("❌ Brak uprawnień!", ephemeral=True)
-        return
-    
-    embed = discord.Embed(
-        title="🎫 Tickets",
-        description="Want to place an order, need to contact the owner or staff for help?\nClick the appropriate button below to open a private channel with the administration.\n\nPlease don't open the tickets without a proper reason.",
-        color=discord.Color.from_rgb(47, 49, 54)
-    )
-    await interaction.channel.send(embed=embed, view=TicketView())
-    await interaction.response.send_message("✅ Wysłano panel ticketów!", ephemeral=True)
-
-@bot.tree.command(name="setup_partner", description="Wysyła panel partnerstw")
-async def setup_partner(interaction: discord.Interaction):
-    if not interaction.user.guild_permissions.administrator:
-        await interaction.response.send_message("❌ Brak uprawnień!", ephemeral=True)
-        return
-    
-    embed = discord.Embed(
-        title="🤝 Partnership / Współpraca",
-        description="Chcesz nawiązać partnerstwo z naszym serwerem? Kliknij przycisk poniżej, aby otworzyć kanał zgłoszeniowy.",
-        color=discord.Color.gold()
-    )
-    await interaction.channel.send(embed=embed, view=PartnerView())
-    await interaction.response.send_message("✅ Wysłano panel partnerstw!", ephemeral=True)
-
-@bot.tree.command(name="add", description="Dodaje użytkownika do aktywnego ticketa")
-@app_commands.describe(member="Użytkownik, którego chcesz dodać")
-async def add_user(interaction: discord.Interaction, member: discord.Member):
-    if not any(interaction.channel.name.startswith(e) for e in ["🛒", "👑", "❓", "📄", "🤝"]):
-        await interaction.response.send_message("❌ Tej komendy można używać tylko w kanałach ticketów!", ephemeral=True)
-        return
-
-    try:
-        await interaction.channel.set_permissions(member, view_channel=True, send_messages=True, read_message_history=True)
-        await interaction.response.send_message(f"✅ Dodano użytkownika {member.mention} do ticketa.")
-    except Exception as e:
-        await interaction.response.send_message(f"❌ Wystąpił błąd: {e}", ephemeral=True)
-
-@bot.tree.command(name="remove", description="Usuwa użytkownika z aktywnego ticketa")
-@app_commands.describe(member="Użytkownik, którego chcesz usunąć")
-async def remove_user(interaction: discord.Interaction, member: discord.Member):
-    if not any(interaction.channel.name.startswith(e) for e in ["🛒", "👑", "❓", "📄", "🤝"]):
-        await interaction.response.send_message("❌ Tej komendy można używać tylko w kanałach ticketów!", ephemeral=True)
-        return
-
-    try:
-        await interaction.channel.set_permissions(member, overwrite=None)
-        await interaction.response.send_message(f"✅ Usunięto użytkownika {member.mention} z ticketa.")
-    except Exception as e:
-        await interaction.response.send_message(f"❌ Wystąpił błąd: {e}", ephemeral=True)
-
-@bot.tree.command(name="minigame", description="Rozpoczn
+        await interaction.
