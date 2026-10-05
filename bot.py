@@ -2,11 +2,39 @@ import os
 import discord
 from discord import app_commands
 from discord.ext import commands
+import io
 
 intents = discord.Intents.default()
 intents.message_content = True
 intents.guilds = True
 intents.members = True
+
+class CloseTicketView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Close Ticket", style=discord.ButtonStyle.danger, custom_id="close_ticket_button")
+    async def close_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True)
+        channel = interaction.channel
+        
+        # Generowanie transcriptu (historii wiadomości)
+        messages_history = []
+        async for msg in channel.history(limit=500, oldest_first=True):
+            timestamp = msg.created_at.strftime('%Y-%m-%d %H:%M')
+            messages_history.append(f"[{timestamp}] {msg.author}: {msg.content}")
+        
+        transcript_text = f"Transcript z ticketa: {channel.name}\n" + "\n".join(messages_history)
+        file = discord.File(io.BytesIO(transcript_text.encode('utf-8')), filename=f"transcript-{channel.name}.txt")
+        
+        # Próba wysłania transcriptu na PW użytkownika, który założył kanał
+        try:
+            await interaction.user.send("Oto transcript z Twojego zamkniętego ticketa:", file=file)
+        except Exception:
+            pass
+
+        await interaction.followup.send("🔒 Zamykanie kanału...", ephemeral=True)
+        await channel.delete()
 
 class VerifyView(discord.ui.View):
     def __init__(self):
@@ -20,43 +48,79 @@ class TicketView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    async def create_ticket_channel(self, interaction: discord.Interaction, ticket_type: str):
+    async def create_ticket_channel(self, interaction: discord.Interaction, ticket_type: str, emoji: str, title_name: str, desc_text: str):
         await interaction.response.defer(ephemeral=True)
         guild = interaction.guild
+        
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(view_channel=False),
-            interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True),
-            guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True)
+            interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True),
+            guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True)
         }
         
+        # Szukanie odpowiedniej kategorii na serwerze pasującej do typu ticketa
+        category = None
+        for cat in guild.categories:
+            if ticket_type.lower() in cat.name.lower() or ticket_type in cat.name.lower():
+                category = cat
+                break
+        if not category:
+            category = interaction.channel.category
+
         try:
-            channel = await guild.create_text_channel(f"{ticket_type}-{interaction.user.name}", overwrites=overwrites)
+            channel = await guild.create_text_channel(
+                f"{emoji}-{ticket_type}-{interaction.user.name}", 
+                overwrites=overwrites,
+                category=category
+            )
+            
+            # Zbieranie ról, które mają uprawnienia do widzenia tego kanału (poza @everyone i botem)
+            roles_to_ping = []
+            for target, overwrite in channel.overwrites.items():
+                if isinstance(target, discord.Role) and target != guild.default_role and target != guild.me:
+                    if overwrite.view_channel is True:
+                        roles_to_ping.append(target.mention)
+
+            ping_str = " ".join(roles_to_ping) if roles_to_ping else ""
+
             await interaction.followup.send(f"✅ Utworzono Twój ticket: {channel.mention}", ephemeral=True)
-            await channel.send(f"Witaj {interaction.user.mention}! Wybrałeś kategorię: **{ticket_type.upper()}**. Opisz swój sprawę, a administracja wkrótce odpowie.")
+            
+            embed = discord.Embed(
+                title=title_name,
+                description=desc_text,
+                color=discord.Color.from_rgb(47, 49, 54)
+            )
+            
+            content_msg = f"Hello {interaction.user.mention}!"
+            if ping_str:
+                content_msg += f" {ping_str}"
+
+            await channel.send(content_msg, embed=embed, view=CloseTicketView())
+            
         except Exception as e:
             await interaction.followup.send(f"❌ Nie udało się utworzyć kanału ticketu: {e}", ephemeral=True)
 
     @discord.ui.button(label="Shop 🛒", style=discord.ButtonStyle.green, custom_id="ticket_shop")
     async def shop_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.create_ticket_channel(interaction, "shop")
+        await self.create_ticket_channel(interaction, "shop", "🛒", "Shop Ticket", "Hello! Welcome to the Shop.\n**What would you like to buy today?** Please specify your order and wait for the staff.\n\nTo close the ticket, click the button below.")
 
     @discord.ui.button(label="Owner 👑", style=discord.ButtonStyle.secondary, custom_id="ticket_owner")
     async def owner_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.create_ticket_channel(interaction, "owner")
+        await self.create_ticket_channel(interaction, "owner", "👑", "Owner Ticket", "Hello! Welcome to the Owner contact.\n**How can the owner help you?** Please describe your case and wait for a response.\n\nTo close the ticket, click the button below.")
 
     @discord.ui.button(label="Support ❓", style=discord.ButtonStyle.primary, custom_id="ticket_support")
     async def support_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.create_ticket_channel(interaction, "support")
+        await self.create_ticket_channel(interaction, "support", "❓", "Support Ticket", "Hello! Welcome to Support.\n**What issue are you experiencing?** Describe it clearly and wait for the staff.\n\nTo close the ticket, click the button below.")
 
     @discord.ui.button(label="Recruitment 📄", style=discord.ButtonStyle.danger, custom_id="ticket_recruitment")
     async def recruitment_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.create_ticket_channel(interaction, "recruitment")
+        await self.create_ticket_channel(interaction, "recruitment", "📄", "Recruitment Ticket", "Hello! Welcome to Recruitment.\n**Want to join the staff?** Provide your details and experience below.\n\nTo close the ticket, click the button below.")
 
 class PartnerView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="Partner 🤝", style=discord.ButtonStyle.blurple, custom_id="purecfg_partner_button") # discord.ui.button w odcieniu żółtym/primary/secondary (użyjemy żółtego jako blurple/secondary albo oznacznik)
+    @discord.ui.button(label="Partner 🤝", style=discord.ButtonStyle.primary, custom_id="purecfg_partner_button")
     async def partner_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer(ephemeral=True)
         guild = interaction.guild
@@ -66,10 +130,36 @@ class PartnerView(discord.ui.View):
             guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True)
         }
         
+        category = None
+        for cat in guild.categories:
+            if "partner" in cat.name.lower():
+                category = cat
+                break
+        if not category:
+            category = interaction.channel.category
+        
         try:
-            channel = await guild.create_text_channel(f"partner-{interaction.user.name}", overwrites=overwrites)
+            channel = await guild.create_text_channel(f"🤝-partner-{interaction.user.name}", overwrites=overwrites, category=category)
+            
+            roles_to_ping = []
+            for target, overwrite in channel.overwrites.items():
+                if isinstance(target, discord.Role) and target != guild.default_role and target != guild.me:
+                    if overwrite.view_channel is True:
+                        roles_to_ping.append(target.mention)
+            ping_str = " ".join(roles_to_ping) if roles_to_ping else ""
+
             await interaction.followup.send(f"✅ Utworzono kanał partnerstwa: {channel.mention}", ephemeral=True)
-            await channel.send(f"Witaj {interaction.user.mention}! Chcesz nawiązać współpracę? Przedstaw szczegóły.")
+            
+            embed = discord.Embed(
+                title="Partnership Ticket",
+                description="Hello! Welcome to Partnership.\n**Please provide your server invite and details.**\n\nTo close the ticket, click the button below.",
+                color=discord.Color.gold()
+            )
+            content_msg = f"Hello {interaction.user.mention}!"
+            if ping_str:
+                content_msg += f" {ping_str}"
+
+            await channel.send(content_msg, embed=embed, view=CloseTicketView())
         except Exception as e:
             await interaction.followup.send(f"❌ Wystąpił błąd: {e}", ephemeral=True)
 
@@ -81,6 +171,7 @@ class PurecfgBot(commands.Bot):
         self.add_view(VerifyView())
         self.add_view(TicketView())
         self.add_view(PartnerView())
+        self.add_view(CloseTicketView())
 
         GUILD_ID = discord.Object(id=1540347771616362638)
         self.tree.copy_global_to(guild=GUILD_ID)
@@ -121,61 +212,4 @@ async def setup_ticket(interaction: discord.Interaction):
     await interaction.channel.send(embed=embed, view=TicketView())
     await interaction.response.send_message("✅ Wysłano panel ticketów!", ephemeral=True)
 
-@bot.tree.command(name="setup_partner", description="Wysyła panel partnerstw z żółtym przyciskiem")
-async def setup_partner(interaction: discord.Interaction):
-    if not interaction.user.guild_permissions.administrator:
-        await interaction.response.send_message("❌ Brak uprawnień!", ephemeral=True)
-        return
-    
-    embed = discord.Embed(
-        title="🤝 Partnership / Współpraca",
-        description="Chcesz nawiązać partnerstwo z naszym serwerem? Kliknij przycisk poniżej, aby otworzyć kanał zgłoszeniowy.",
-        color=discord.Color.gold()
-    )
-    # Żółty przycisk uzyskujemy używając style.secondary lub blurple (w Discord API styl żółty to ButtonStyle.blurple lub secondary/success w zależności od preferencji, tutaj damy customowy)
-    view = PartnerView()
-    # Zmiana stylu przycisku na żółty (Secondary w Discord to szary, Primary to niebieski, Success to zielony, Danger to czerwony. Discord nie ma natywnego żółtego koloru jako pojedynczego enum dla zwykłego przycisku linku poza szarym/blurple, ale użyjemy blurple lub secondary w zależności od wyglądu, albo zrobimy szary/niebieski jako uniwersalny). 
-    # Dla pewności ustawiamy styl secondary (szary/neutralny) lub przełączamy na blurple.
-    await interaction.channel.send(embed=embed, view=view)
-    await interaction.response.send_message("✅ Wysłano panel partnerstw!", ephemeral=True)
-
-@bot.tree.command(name="minigame", description="Rozpocznij minigrę")
-async def minigame(interaction: discord.Interaction):
-    if interaction.channel.name != "minigame":
-        await interaction.response.send_message("❌ Tej komendy można używać tylko na kanale #minigame!", ephemeral=True)
-        return
-    await interaction.response.send_message("🎮 Rozpoczęto minigrę! Powodzenia!")
-
-@bot.tree.command(name="wzor_staff", description="Wyświetla wzór podania na staff")
-async def wzor_staff(interaction: discord.Interaction):
-    embed = discord.Embed(
-        title="📝 Rekrutacja na Staff - Wzór",
-        description="Skopiuj poniższy wzór i wyślij go w odpowiednim kanale.",
-        color=discord.Color.blue()
-    )
-    embed.add_field(name="1. Twoje imię:", value="[Wpisz tutaj]", inline=False)
-    embed.add_field(name="2. Twój wiek:", value="[Wpisz tutaj]", inline=False)
-    embed.add_field(name="3. Doświadczenie:", value="[Wpisz tutaj]", inline=False)
-    await interaction.response.send_message(embed=embed)
-
-@bot.tree.command(name="accept", description="Akceptuje kandydata i nadaje rangę Trial Staff")
-@app_commands.describe(member="Użytkownik, którego chcesz zaakceptować")
-async def accept(interaction: discord.Interaction, member: discord.Member):
-    if not interaction.user.guild_permissions.manage_roles:
-        await interaction.response.send_message("❌ Nie masz uprawnień.", ephemeral=True)
-        return
-
-    role = interaction.guild.get_role(1540360086617063584)
-    if not role:
-        await interaction.response.send_message("❌ Nie znaleziono roli Trial Staff!", ephemeral=True)
-        return
-
-    try:
-        await member.add_roles(role)
-        await interaction.response.send_message(f"✅ Zaakceptowano użytkownika {member.mention}!")
-    except Exception as e:
-        await interaction.response.send_message(f"❌ Błąd: {e}", ephemeral=True)
-
-TOKEN = os.getenv("DISCORD_TOKEN")
-if TOKEN:
-    bot.run(TOKEN)
+@bot.tree.command(name="setup_partner", description="Wys
