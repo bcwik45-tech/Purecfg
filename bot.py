@@ -4,6 +4,7 @@ from discord.ext import commands
 from discord import app_commands
 import asyncio
 import random
+from datetime import datetime, time, timezone
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -195,7 +196,7 @@ async def on_member_update(before, after):
 
             embed = discord.Embed(
                 title="💎 New server Boost!",
-                description=f"{after.mention} **BOOST!**\nthe thanks for boosting our server!\n*Go check out our booster zone!*",
+                description=f"{after.mention} **BOOST!**\nthanks for boosting our server!\n*Go check out our booster zone!*",
                 color=discord.Color.purple()
             )
             embed.set_thumbnail(url=after.display_avatar.url)
@@ -260,7 +261,8 @@ async def unban(interaction: discord.Interaction, user_id: str):
     except Exception as e:
         await interaction.response.send_message(f"❌ Wystąpił błąd. Upewnij się, że podajesz poprawne ID użytkownika.", ephemeral=True)
 
-@bot.tree.command(name="minigame", description="Zagraj o rangę .boosterzone (szansa 1 na 50!)")
+@bot.tree.command(name="minigame", description="Zagraj o rangę .boosterzone (szansa 1 na 50, raz dziennie!)")
+@app_commands.checks.cooldown(1, 86400, key=lambda i: (i.guild_id, i.user.id))
 async def minigame(interaction: discord.Interaction):
     roll = random.randint(1, 50)
     
@@ -272,11 +274,30 @@ async def minigame(interaction: discord.Interaction):
         
         try:
             await interaction.user.add_roles(role)
-            await interaction.response.send_message(f"🎉 **GRATULACJE!** Trafiłeś szczęśliwy los (1/50) i wygrałeś rangę **.boosterzone**! {interaction.user.mention}", ephemeral=False)
+            embed = discord.Embed(
+                title="🏆 You win!",
+                description=f"🎉 {interaction.user.mention} trafił szczęśliwy los (1/50) i wygrał rangу **.boosterzone**!",
+                color=discord.Color.green()
+            )
+            embed.set_thumbnail(url=interaction.user.display_avatar.url)
+            await interaction.response.send_message(embed=embed)
         except Exception as e:
             await interaction.response.send_message(f"❌ Wystąpił błąd przy nadawaniu rangi: {e}", ephemeral=True)
     else:
-        await interaction.response.send_message(f"😢 Niestety tym razem się nie udało! (Wylosowano numer {roll}/50). Spróbuj ponownie!", ephemeral=True)
+        embed = discord.Embed(
+            title="❌ You lost",
+            description=f"😢 Niestety tym razem się nie udało! Spróbuj ponownie jutro.",
+            color=discord.Color.red()
+        )
+        embed.set_thumbnail(url=interaction.user.display_avatar.url)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+@minigame.error
+async def minigame_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+    if isinstance(error, app_commands.CommandOnCooldown):
+        await interaction.response.send_message(f"⏳ Wykorzystałeś już swoją próbę na dzisiaj! Spróbuj ponownie jutro.", ephemeral=True)
+    else:
+        raise error
 
 # --- KOMENDY SETUPUJĄCE PANELE ---
 @bot.command()
