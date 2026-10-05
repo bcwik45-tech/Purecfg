@@ -272,4 +272,58 @@ async def add_user(interaction: discord.Interaction, member: discord.Member):
     except Exception as e:
         await interaction.response.send_message(f"❌ Wystąpił błąd: {e}", ephemeral=True)
 
-@bot.tree.command(name="remove", description="Remove
+@bot.tree.command(name="remove", description="Remove user from active ticket")
+@app_commands.describe(member="Użytkownik, którego chcesz usunąć")
+async def remove_user(interaction: discord.Interaction, member: discord.Member):
+    if not any(interaction.channel.name.startswith(e) for e in ["🛒", "👑", "❓", "📄", "🤝"]):
+        await interaction.response.send_message("❌ Tej komendy można używać tylko w kanałach ticketów!", ephemeral=True)
+        return
+
+    try:
+        await interaction.channel.set_permissions(member, overwrite=None)
+        await interaction.response.send_message(f"✅ Usunięto użytkownika {member.mention} z ticketa.")
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Wystąpił błąd: {e}", ephemeral=True)
+
+@bot.tree.command(name="minigame", description="Start minigame")
+async def minigame(interaction: discord.Interaction):
+    if interaction.channel.name != "minigame":
+        await interaction.response.send_message("❌ Tej komendy można używać tylko na kanale #minigame!", ephemeral=True)
+        return
+    await interaction.response.send_message("🎮 Rozpoczęto minigrę! Powodzenia!")
+
+@bot.tree.command(name="wzor_staff", description="Show staff application template")
+async def wzor_staff(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="📝 Rekrutacja na Staff - Wzór",
+        description="Skopiuj poniższy wzór i wyślij go w odpowiednim kanale.",
+        color=discord.Color.blue()
+    )
+    embed.add_field(name="1. Wiek:", value="[Wpisz tutaj]", inline=False)
+    embed.add_field(name="2. Klipy/HL:", value="[Wpisz tutaj]", inline=False)
+    embed.add_field(name="3. Aktywność:", value="[Wpisz tutaj]", inline=False)
+    await interaction.response.send_message(embed=embed)
+
+@bot.tree.command(name="accept", description="Accept candidate and give roles")
+@app_commands.describe(member="Użytkownik, którego chcesz zaakceptować")
+async def accept(interaction: discord.Interaction, member: discord.Member):
+    if not interaction.user.guild_permissions.manage_roles:
+        await interaction.response.send_message("❌ Nie masz uprawnień.", ephemeral=True)
+        return
+
+    role1 = interaction.guild.get_role(1540360086617063584)
+    role2 = interaction.guild.get_role(1540359963346608168)
+
+    if not role1 or not role2:
+        await interaction.response.send_message("❌ Nie znaleziono jednej lub obu ról na serwerze!", ephemeral=True)
+        return
+
+    try:
+        await member.add_roles(role1, role2)
+        await interaction.response.send_message(f"✅ Zaakceptowano użytkownika {member.mention} i nadano obie rangi!")
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Błąd podczas nadawania ról: {e}", ephemeral=True)
+
+TOKEN = os.getenv("DISCORD_TOKEN")
+if TOKEN:
+    bot.run(TOKEN)
