@@ -194,3 +194,82 @@ class PartnerView(discord.ui.View):
 
             await channel.send(content_msg, embed=embed, view=CloseTicketView())
         except Exception as e:
+            await interaction.followup.send(f"❌ Wystąpił błąd: {e}", ephemeral=True)
+
+class PurecfgBot(commands.Bot):
+    def __init__(self):
+        super().__init__(command_prefix="!", intents=intents)
+
+    async def setup_hook(self):
+        self.add_view(VerifyView())
+        self.add_view(TicketView())
+        self.add_view(PartnerView())
+        self.add_view(CloseTicketView())
+
+        GUILD_ID = discord.Object(id=1540347771616362638)
+        self.tree.copy_global_to(guild=GUILD_ID)
+        await self.tree.sync(guild=GUILD_ID)
+        print("Zsynchronizowano komendy i widoki dla serwera!")
+
+bot = PurecfgBot()
+
+@bot.event
+async def on_ready():
+    print(f"Zalogowano jako {bot.user} (ID: {bot.user.id})")
+
+@bot.tree.command(name="setup_verify", description="Send verification panel")
+async def setup_verify(interaction: discord.Interaction):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("❌ Brak uprawnień!", ephemeral=True)
+        return
+    
+    embed = discord.Embed(
+        title="Verification",
+        description="Click on verification to get access to the channels",
+        color=discord.Color.green()
+    )
+    await interaction.channel.send(embed=embed, view=VerifyView())
+    await interaction.response.send_message("✅ Wysłano panel weryfikacji!", ephemeral=True)
+
+@bot.tree.command(name="setup_ticket", description="Send ticket panel")
+async def setup_ticket(interaction: discord.Interaction):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("❌ Brak uprawnień!", ephemeral=True)
+        return
+    
+    embed = discord.Embed(
+        title="🎫 Tickets",
+        description="Want to place an order, need to contact the owner or staff for help?\nClick the appropriate button below to open a private channel with the administration.\n\nPlease don't open the tickets without a proper reason.",
+        color=discord.Color.from_rgb(47, 49, 54)
+    )
+    await interaction.channel.send(embed=embed, view=TicketView())
+    await interaction.response.send_message("✅ Wysłano panel ticketów!", ephemeral=True)
+
+@bot.tree.command(name="setup_partner", description="Send partner panel")
+async def setup_partner(interaction: discord.Interaction):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("❌ Brak uprawnień!", ephemeral=True)
+        return
+    
+    embed = discord.Embed(
+        title="🤝 Partnership / Współpraca",
+        description="Chcesz nawiązać partnerstwo z naszym serwerem? Kliknij przycisk poniżej, aby otworzyć kanał zgłoszeniowy.",
+        color=discord.Color.gold()
+    )
+    await interaction.channel.send(embed=embed, view=PartnerView())
+    await interaction.response.send_message("✅ Wysłano panel partnerstw!", ephemeral=True)
+
+@bot.tree.command(name="add", description="Add user to active ticket")
+@app_commands.describe(member="Użytkownik, którego chcesz dodać")
+async def add_user(interaction: discord.Interaction, member: discord.Member):
+    if not any(interaction.channel.name.startswith(e) for e in ["🛒", "👑", "❓", "📄", "🤝"]):
+        await interaction.response.send_message("❌ Tej komendy można używać tylko w kanałach ticketów!", ephemeral=True)
+        return
+
+    try:
+        await interaction.channel.set_permissions(member, view_channel=True, send_messages=True, read_message_history=True)
+        await interaction.response.send_message(f"✅ Dodano użytkownika {member.mention} do ticketa.")
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Wystąpił błąd: {e}", ephemeral=True)
+
+@bot.tree.command(name="remove", description="Remove
