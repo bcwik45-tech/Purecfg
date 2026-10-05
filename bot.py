@@ -34,6 +34,30 @@ class CloseTicketView(discord.ui.View):
         await interaction.followup.send("🔒 Zamykanie kanału...", ephemeral=True)
         await channel.delete()
 
+    @discord.ui.button(label="Call Staff 🔔", style=discord.ButtonStyle.secondary, custom_id="call_staff_button")
+    async def call_staff(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True)
+        channel = interaction.channel
+        guild = interaction.guild
+        category = channel.category
+
+        roles_to_ping = []
+        targets_to_check = list(channel.overwrites.items())
+        if category:
+            targets_to_check.extend(list(category.overwrites.items()))
+
+        for target, overwrite in targets_to_check:
+            if isinstance(target, discord.Role) and target != guild.default_role and target != guild.me:
+                if overwrite.view_channel is True and target.mention not in roles_to_ping:
+                    roles_to_ping.append(target.mention)
+
+        if roles_to_ping:
+            ping_str = " ".join(roles_to_ping)
+            await channel.send(f"🔔 {interaction.user.mention} wzywa administrację: {ping_str}")
+            await interaction.followup.send("✅ Wezwano staffa do ticketa!", ephemeral=True)
+        else:
+            await interaction.followup.send("❌ Nie znaleziono ról z dostępem do tego kanału, które można spingować.", ephemeral=True)
+
 class VerifyView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -77,9 +101,13 @@ class TicketView(discord.ui.View):
             )
             
             roles_to_ping = []
-            for target, overwrite in channel.overwrites.items():
+            targets_to_check = list(channel.overwrites.items())
+            if category:
+                targets_to_check.extend(list(category.overwrites.items()))
+
+            for target, overwrite in targets_to_check:
                 if isinstance(target, discord.Role) and target != guild.default_role and target != guild.me:
-                    if overwrite.view_channel is True:
+                    if overwrite.view_channel is True and target.mention not in roles_to_ping:
                         roles_to_ping.append(target.mention)
 
             ping_str = " ".join(roles_to_ping) if roles_to_ping else ""
@@ -143,9 +171,13 @@ class PartnerView(discord.ui.View):
             channel = await guild.create_text_channel(f"🤝-partner-{interaction.user.name}", overwrites=overwrites, category=category)
             
             roles_to_ping = []
-            for target, overwrite in channel.overwrites.items():
+            targets_to_check = list(channel.overwrites.items())
+            if category:
+                targets_to_check.extend(list(category.overwrites.items()))
+
+            for target, overwrite in targets_to_check:
                 if isinstance(target, discord.Role) and target != guild.default_role and target != guild.me:
-                    if overwrite.view_channel is True:
+                    if overwrite.view_channel is True and target.mention not in roles_to_ping:
                         roles_to_ping.append(target.mention)
             ping_str = " ".join(roles_to_ping) if roles_to_ping else ""
 
@@ -162,134 +194,3 @@ class PartnerView(discord.ui.View):
 
             await channel.send(content_msg, embed=embed, view=CloseTicketView())
         except Exception as e:
-            await interaction.followup.send(f"❌ Wystąpił błąd: {e}", ephemeral=True)
-
-class PurecfgBot(commands.Bot):
-    def __init__(self):
-        super().__init__(command_prefix="!", intents=intents)
-
-    async def setup_hook(self):
-        self.add_view(VerifyView())
-        self.add_view(TicketView())
-        self.add_view(PartnerView())
-        self.add_view(CloseTicketView())
-
-        GUILD_ID = discord.Object(id=1540347771616362638)
-        self.tree.copy_global_to(guild=GUILD_ID)
-        await self.tree.sync(guild=GUILD_ID)
-        print("Zsynchronizowano komendy i widoki dla serwera!")
-
-bot = PurecfgBot()
-
-@bot.event
-async def on_ready():
-    print(f"Zalogowano jako {bot.user} (ID: {bot.user.id})")
-
-@bot.tree.command(name="setup_verify", description="Send verification panel")
-async def setup_verify(interaction: discord.Interaction):
-    if not interaction.user.guild_permissions.administrator:
-        await interaction.response.send_message("❌ Brak uprawnień!", ephemeral=True)
-        return
-    
-    embed = discord.Embed(
-        title="Verification",
-        description="Click on verification to get access to the channels",
-        color=discord.Color.green()
-    )
-    await interaction.channel.send(embed=embed, view=VerifyView())
-    await interaction.response.send_message("✅ Wysłano panel weryfikacji!", ephemeral=True)
-
-@bot.tree.command(name="setup_ticket", description="Send ticket panel")
-async def setup_ticket(interaction: discord.Interaction):
-    if not interaction.user.guild_permissions.administrator:
-        await interaction.response.send_message("❌ Brak uprawnień!", ephemeral=True)
-        return
-    
-    embed = discord.Embed(
-        title="🎫 Tickets",
-        description="Want to place an order, need to contact the owner or staff for help?\nClick the appropriate button below to open a private channel with the administration.\n\nPlease don't open the tickets without a proper reason.",
-        color=discord.Color.from_rgb(47, 49, 54)
-    )
-    await interaction.channel.send(embed=embed, view=TicketView())
-    await interaction.response.send_message("✅ Wysłano panel ticketów!", ephemeral=True)
-
-@bot.tree.command(name="setup_partner", description="Send partner panel")
-async def setup_partner(interaction: discord.Interaction):
-    if not interaction.user.guild_permissions.administrator:
-        await interaction.response.send_message("❌ Brak uprawnień!", ephemeral=True)
-        return
-    
-    embed = discord.Embed(
-        title="🤝 Partnership / Współpraca",
-        description="Chcesz nawiązać partnerstwo z naszym serwerem? Kliknij przycisk poniżej, aby otworzyć kanał zgłoszeniowy.",
-        color=discord.Color.gold()
-    )
-    await interaction.channel.send(embed=embed, view=PartnerView())
-    await interaction.response.send_message("✅ Wysłano panel partnerstw!", ephemeral=True)
-
-@bot.tree.command(name="add", description="Add user to active ticket")
-@app_commands.describe(member="Użytkownik, którego chcesz dodać")
-async def add_user(interaction: discord.Interaction, member: discord.Member):
-    if not any(interaction.channel.name.startswith(e) for e in ["🛒", "👑", "❓", "📄", "🤝"]):
-        await interaction.response.send_message("❌ Tej komendy można używać tylko w kanałach ticketów!", ephemeral=True)
-        return
-
-    try:
-        await interaction.channel.set_permissions(member, view_channel=True, send_messages=True, read_message_history=True)
-        await interaction.response.send_message(f"✅ Dodano użytkownika {member.mention} do ticketa.")
-    except Exception as e:
-        await interaction.response.send_message(f"❌ Wystąpił błąd: {e}", ephemeral=True)
-
-@bot.tree.command(name="remove", description="Remove user from active ticket")
-@app_commands.describe(member="Użytkownik, którego chcesz usunąć")
-async def remove_user(interaction: discord.Interaction, member: discord.Member):
-    if not any(interaction.channel.name.startswith(e) for e in ["🛒", "👑", "❓", "📄", "🤝"]):
-        await interaction.response.send_message("❌ Tej komendy można używać tylko w kanałach ticketów!", ephemeral=True)
-        return
-
-    try:
-        await interaction.channel.set_permissions(member, overwrite=None)
-        await interaction.response.send_message(f"✅ Usunięto użytkownika {member.mention} z ticketa.")
-    except Exception as e:
-        await interaction.response.send_message(f"❌ Wystąpił błąd: {e}", ephemeral=True)
-
-@bot.tree.command(name="minigame", description="Start minigame")
-async def minigame(interaction: discord.Interaction):
-    if interaction.channel.name != "minigame":
-        await interaction.response.send_message("❌ Tej komendy można używać tylko na kanale #minigame!", ephemeral=True)
-        return
-    await interaction.response.send_message("🎮 Rozpoczęto minigrę! Powodzenia!")
-
-@bot.tree.command(name="wzor_staff", description="Show staff application template")
-async def wzor_staff(interaction: discord.Interaction):
-    embed = discord.Embed(
-        title="📝 Rekrutacja na Staff - Wzór",
-        description="Skopiuj poniższy wzór i wyślij go w odpowiednim kanale.",
-        color=discord.Color.blue()
-    )
-    embed.add_field(name="1. Wiek:", value="[Wpisz tutaj]", inline=False)
-    embed.add_field(name="2. Klipy/HL:", value="[Wpisz tutaj]", inline=False)
-    embed.add_field(name="3. Aktywność:", value="[Wpisz tutaj]", inline=False)
-    await interaction.response.send_message(embed=embed)
-
-@bot.tree.command(name="accept", description="Accept candidate and give role")
-@app_commands.describe(member="Użytkownik, którego chcesz zaakceptować")
-async def accept(interaction: discord.Interaction, member: discord.Member):
-    if not interaction.user.guild_permissions.manage_roles:
-        await interaction.response.send_message("❌ Nie masz uprawnień.", ephemeral=True)
-        return
-
-    role = interaction.guild.get_role(1540359963346608168)
-    if not role:
-        await interaction.response.send_message("❌ Nie znaleziono roli Pure (ID: 1540359963346608168)", ephemeral=True)
-        return
-
-    try:
-        await member.add_roles(role)
-        await interaction.response.send_message(f"✅ Zaakceptowano użytkownika {member.mention} i nadano rangę Pure!")
-    except Exception as e:
-        await interaction.response.send_message(f"❌ Błąd podczas nadawania roli: {e}", ephemeral=True)
-
-TOKEN = os.getenv("DISCORD_TOKEN")
-if TOKEN:
-    bot.run(TOKEN)
