@@ -255,32 +255,4 @@ async def remove_user(interaction: discord.Interaction, member: discord.Member):
     except Exception as e:
         await interaction.response.send_message(f"❌ Wystąpił błąd: {e}", ephemeral=True)
 
-@bot.tree.command(name="minigame", description="Rozpocznij minigrę")
-async def minigame(interaction: discord.Interaction):
-    if interaction.channel.name != "minigame":
-        await interaction.response.send_message("❌ Tej komendy można używać tylko na kanale #minigame!", ephemeral=True)
-        return
-    await interaction.response.send_message("🎮 Rozpoczęto minigrę! Powodzenia!")
-
-@bot.tree.command(name="wzor_staff", description="Wyświetla wzór podania na staff")
-async def wzor_staff(interaction: discord.Interaction):
-    embed = discord.Embed(
-        title="📝 Rekrutacja na Staff - Wzór",
-        description="Skopiuj poniższy wzór i wyślij go w odpowiednim kanale.",
-        color=discord.Color.blue()
-    )
-    embed.add_field(name="1. Wiek:", value="[Wpisz tutaj]", inline=False)
-    embed.add_field(name="2. Klipy/HL:", value="[Wpisz tutaj]", inline=False)
-    embed.add_field(name="3. Aktywność:", value="[Wpisz tutaj]", inline=False)
-    await interaction.response.send_message(embed=embed)
-
-@bot.tree.command(name="accept", description="Akceptuje kandydata i nadaje rangę Pure")
-@app_commands.describe(member="Użytkownik, którego chcesz zaakceptować")
-async def accept(interaction: discord.Interaction, member: discord.Member):
-    if not interaction.user.guild_permissions.manage_roles:
-        await interaction.response.send_message("❌ Nie masz uprawnień.", ephemeral=True)
-        return
-
-    role = interaction.guild.get_role(1540359963346608168)
-    if not role:
-        await interaction.response.send_message("❌ Nie znaleziono roli Pure (ID: 15403599633466081
+@bot.tree.command(name="minigame", description="Rozpoczn
