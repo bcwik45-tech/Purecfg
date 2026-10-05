@@ -27,7 +27,7 @@ class CloseTicketView(discord.ui.View):
         transcript_text = f"Transcript z ticketa: {channel.name}\n" + "\n".join(messages_history)
         file = discord.File(io.BytesIO(transcript_text.encode('utf-8')), filename=f"transcript-{channel.name}.txt")
         
-        # Próba wysłania transcriptu na PW użytkownika, który założył kanał
+        # Próba wysłania transcriptu na PW użytkownika
         try:
             await interaction.user.send("Oto transcript z Twojego zamkniętego ticketa:", file=file)
         except Exception:
@@ -48,7 +48,7 @@ class TicketView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    async def create_ticket_channel(self, interaction: discord.Interaction, ticket_type: str, emoji: str, title_name: str, desc_text: str):
+    async def create_ticket_channel(self, interaction: discord.Interaction, ticket_type: str, emoji: str, title_name: str, desc_text: str, category_id: int = None):
         await interaction.response.defer(ephemeral=True)
         guild = interaction.guild
         
@@ -58,12 +58,18 @@ class TicketView(discord.ui.View):
             guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True)
         }
         
-        # Szukanie odpowiedniej kategorii na serwerze pasującej do typu ticketa
         category = None
-        for cat in guild.categories:
-            if ticket_type.lower() in cat.name.lower() or ticket_type in cat.name.lower():
-                category = cat
-                break
+        # Jeśli podano konkretne ID kategorii, użyj go
+        if category_id:
+            category = guild.get_channel(category_id)
+        
+        # Jeśli nie znaleziono po ID, szukaj po nazwie
+        if not category:
+            for cat in guild.categories:
+                if ticket_type.lower() in cat.name.lower() or ticket_type in cat.name.lower():
+                    category = cat
+                    break
+                    
         if not category:
             category = interaction.channel.category
 
@@ -74,7 +80,6 @@ class TicketView(discord.ui.View):
                 category=category
             )
             
-            # Zbieranie ról, które mają uprawnienia do widzenia tego kanału (poza @everyone i botem)
             roles_to_ping = []
             for target, overwrite in channel.overwrites.items():
                 if isinstance(target, discord.Role) and target != guild.default_role and target != guild.me:
@@ -102,7 +107,8 @@ class TicketView(discord.ui.View):
 
     @discord.ui.button(label="Shop 🛒", style=discord.ButtonStyle.green, custom_id="ticket_shop")
     async def shop_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.create_ticket_channel(interaction, "shop", "🛒", "Shop Ticket", "Hello! Welcome to the Shop.\n**What would you like to buy today?** Please specify your order and wait for the staff.\n\nTo close the ticket, click the button below.")
+        # Użycie dedykowanego ID kategorii dla sklepu: 1556300130892906506
+        await self.create_ticket_channel(interaction, "shop", "🛒", "Shop Ticket", "Hello! Welcome to the Shop.\n**What would you like to buy today?** Please specify your order and wait for the staff.\n\nTo close the ticket, click the button below.", category_id=1556300130892906506)
 
     @discord.ui.button(label="Owner 👑", style=discord.ButtonStyle.secondary, custom_id="ticket_owner")
     async def owner_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -226,43 +232,20 @@ async def setup_partner(interaction: discord.Interaction):
     await interaction.channel.send(embed=embed, view=PartnerView())
     await interaction.response.send_message("✅ Wysłano panel partnerstw!", ephemeral=True)
 
-@bot.tree.command(name="minigame", description="Rozpocznij minigrę")
-async def minigame(interaction: discord.Interaction):
-    if interaction.channel.name != "minigame":
-        await interaction.response.send_message("❌ Tej komendy można używać tylko na kanale #minigame!", ephemeral=True)
-        return
-    await interaction.response.send_message("🎮 Rozpoczęto minigrę! Powodzenia!")
-
-@bot.tree.command(name="wzor_staff", description="Wyświetla wzór podania na staff")
-async def wzor_staff(interaction: discord.Interaction):
-    embed = discord.Embed(
-        title="📝 Rekrutacja na Staff - Wzór",
-        description="Skopiuj poniższy wzór i wyślij go w odpowiednim kanale.",
-        color=discord.Color.blue()
-    )
-    embed.add_field(name="1. Wiek:", value="[Wpisz tutaj]", inline=False)
-    embed.add_field(name="2. Klipy/HL:", value="[Wpisz tutaj]", inline=False)
-    embed.add_field(name="3. Aktywność:", value="[Wpisz tutaj]", inline=False)
-    await interaction.response.send_message(embed=embed)
-
-@bot.tree.command(name="accept", description="Akceptuje kandydata i nadaje rangę Pure")
-@app_commands.describe(member="Użytkownik, którego chcesz zaakceptować")
-async def accept(interaction: discord.Interaction, member: discord.Member):
-    if not interaction.user.guild_permissions.manage_roles:
-        await interaction.response.send_message("❌ Nie masz uprawnień.", ephemeral=True)
-        return
-
-    role = interaction.guild.get_role(1540359963346608168)
-    if not role:
-        await interaction.response.send_message("❌ Nie znaleziono roli Pure (ID: 1540359963346608168)!", ephemeral=True)
+# Komenda /add do dodawania użytkowników do ticketa
+@bot.tree.command(name="add", description="Dodaje użytkownika do aktywnego ticketa")
+@app_commands.describe(member="Użytkownik, którego chcesz dodać")
+async def add_user(interaction: discord.Interaction, member: discord.Member):
+    # Sprawdzenie czy kanał to ticket (zaczyna się od emotki)
+    if not any(interaction.channel.name.startswith(e) for e in ["🛒", "👑", "❓", "📄", "🤝"]):
+        await interaction.response.send_message("❌ Tej komendy można używać tylko w kanałach ticketów!", ephemeral=True)
         return
 
     try:
-        await member.add_roles(role)
-        await interaction.response.send_message(f"✅ Zaakceptowano użytkownika {member.mention} i nadano rangę Pure!")
+        await interaction.channel.set_permissions(member, view_channel=True, send_messages=True, read_message_history=True)
+        await interaction.response.send_message(f"✅ Dodano użytkownika {member.mention} do ticketa.")
     except Exception as e:
-        await interaction.response.send_message(f"❌ Błąd podczas nadawania roli: {e}", ephemeral=True)
+        await interaction.response.send_message(f"❌ Wystąpił błąd: {e}", ephemeral=True)
 
-TOKEN = os.getenv("DISCORD_TOKEN")
-if TOKEN:
-    bot.run(TOKEN)
+# Komenda /remove do usuwania użytkowników z ticketa
+@bot.tree.
