@@ -233,7 +233,7 @@ async def remove(ctx, member: discord.Member):
     else:
         await ctx.send("❌ Tej komendy można używać tylko na serwerze.")
 
-# --- KOMENDY SLASH (/BAN, /UNBAN oraz /MINIGAME) ---
+# --- KOMENDY SLASH (/BAN, /UNBAN, /MINIGAME, /WZOR_STAFF, /ACCEPT) ---
 @bot.tree.command(name="ban", description="Banuje użytkownika na serwerze")
 @app_commands.describe(member="Użytkownik, którego chcesz zbanować", reason="Powód bana (opcjonalnie)")
 async def ban(interaction: discord.Interaction, member: discord.Member, reason: str = "Brak powodu"):
@@ -251,73 +251,4 @@ async def ban(interaction: discord.Interaction, member: discord.Member, reason: 
 @app_commands.describe(user_id="ID użytkownika, którego chcesz odbanować")
 async def unban(interaction: discord.Interaction, user_id: str):
     if not interaction.user.guild_permissions.ban_members:
-        await interaction.response.send_message("❌ Nie masz uprawnień do używania tej komendy!", ephemeral=True)
-        return
-
-    try:
-        user = await bot.fetch_user(int(user_id))
-        await interaction.guild.unban(user)
-        await interaction.response.send_message(f"✅ Pomyślnie odbisno bana użytkownikowi {user.mention}!", ephemeral=True)
-    except Exception as e:
-        await interaction.response.send_message(f"❌ Wystąpił błąd. Upewnij się, że podajesz poprawne ID użytkownika.", ephemeral=True)
-
-@bot.tree.command(name="minigame", description="Zagraj o rangę .boosterzone (szansa 1 na 50, raz dziennie!)")
-@app_commands.checks.cooldown(1, 86400, key=lambda i: (i.guild_id, i.user.id))
-async def minigame(interaction: discord.Interaction):
-    roll = random.randint(1, 50)
-    
-    if roll == 1:
-        role = discord.utils.get(interaction.guild.roles, name=".boosterzone")
-        if not role:
-            await interaction.response.send_message("🎉 Wygrałeś, ale rola o nazwie `.boosterzone` nie istnieje na serwerze! Stwórz ją.", ephemeral=True)
-            return
-        
-        try:
-            await interaction.user.add_roles(role)
-            embed = discord.Embed(
-                title="🏆 You win",
-                description=f"🎉 {interaction.user.mention} trafił szczęśliwy los (1/50) i wygrał rangę **.boosterzone**!",
-                color=discord.Color.green()
-            )
-            embed.set_thumbnail(url=interaction.user.display_avatar.url)
-            await interaction.response.send_message(embed=embed)
-        except Exception as e:
-            await interaction.response.send_message(f"❌ Wystąpił błąd przy nadawaniu rangi: {e}", ephemeral=True)
-    else:
-        embed = discord.Embed(
-            title="❌ You lost",
-            description=f"😢 {interaction.user.mention}, niestety tym razem się nie udało! Spróbuj ponownie jutro.",
-            color=discord.Color.red()
-        )
-        embed.set_thumbnail(url=interaction.user.display_avatar.url)
-        await interaction.response.send_message(embed=embed)
-
-@minigame.error
-async def minigame_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
-    if isinstance(error, app_commands.CommandOnCooldown):
-        await interaction.response.send_message(f"⏳ Wykorzystałeś już swoją próbę na dzisiaj! Spróbuj ponownie jutro.", ephemeral=True)
-    else:
-        raise error
-
-# --- KOMENDY SETUPUJĄCE PANELE ---
-@bot.command()
-async def setup_weryfikacja(ctx):
-    embed = discord.Embed(
-        title="Verification",
-        description="Click on verification to get access to the channels",
-        color=discord.Color.green()
-    )
-    await ctx.send(embed=embed, view=VerificationView())
-
-@bot.command(aliases=["set_tickets"])
-async def setup_tickets(ctx):
-    embed = discord.Embed(
-        title="Tickets",
-        description="Want to place an order, need to contact the owner or staff for help?\nClick the appropriate button below to open a private channel with the administration.\n\nPlease don't open the tickets without a proper reason.",
-        color=discord.Color.red()
-    )
-    await ctx.send(embed=embed, view=TicketView())
-
-# --- URUCHOMIENIE BOTA ---
-TOKEN = os.getenv("DISCORD_TOKEN")
-bot.run(TOKEN)
+        await interaction.response.send_message("❌ Nie masz uprawn
