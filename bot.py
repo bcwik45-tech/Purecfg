@@ -14,8 +14,12 @@ class PurecfgBot(commands.Bot):
         super().__init__(command_prefix="!", intents=intents)
 
     async def setup_hook(self):
-        await self.tree.sync()
-        print(f"Zsynchronizowano komendy dla {self.user}")
+        # ⚠️ TUTAJ WKLEJ ID SWOJEGO SERWERA (zostawiając literkę d na początku, np. discord.Object(id=123456789012345678))
+        GUILD_ID = discord.Object(id=WSTAW_ID_SERWERA_TUTAJ)
+        
+        self.tree.copy_global_to(guild=GUILD_ID)
+        await self.tree.sync(guild=GUILD_ID)
+        print(f"Zsynchronizowano natychmiast komendy dla serwera!")
 
 bot = PurecfgBot()
 
@@ -50,7 +54,6 @@ async def wzor_staff(interaction: discord.Interaction):
 @bot.tree.command(name="accept", description="Akceptuje kandydata i nadaje rangę Trial Staff")
 @app_commands.describe(member="Użytkownik, którego chcesz zaakceptować")
 async def accept(interaction: discord.Interaction, member: discord.Member):
-    # Sprawdzenie uprawnień (np. administrator lub zarządzanie rolami)
     if not interaction.user.guild_permissions.manage_roles:
         await interaction.response.send_message("❌ Nie masz uprawnień, aby użyć tej komendy.", ephemeral=True)
         return
