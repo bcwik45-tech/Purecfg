@@ -3,10 +3,12 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import asyncio
+import random
 
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
+intents.guilds = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
@@ -63,7 +65,7 @@ class TicketView(discord.ui.View):
             "shop": 1556300130892906506,
             "support": 1556300180624769105,
             "recruitment": 1556300236526329936,
-            "partner": 1556383124424892606  # Tutaj możesz ewentualnie podmienić ID kategorii na serwerze
+            "partner": 1556300290000000000
         }
 
         overwrites = {
@@ -124,12 +126,7 @@ class TicketView(discord.ui.View):
         if role_mentions:
             pings += " " + " ".join(role_mentions)
 
-        embed = discord.Embed(
-            title=title_text,
-            description=desc_text,
-            color=discord.Color.red()
-        )
-
+        embed = discord.Embed(title=title_text, description=desc_text, color=discord.Color.red())
         await ticket_channel.send(content=f"Hello {pings}!", embed=embed, view=CloseTicketView())
 
     @discord.ui.button(label="Shop", style=discord.ButtonStyle.green, emoji="🛒", custom_id="ticket_shop")
@@ -164,7 +161,7 @@ async def on_ready():
         print(e)
     print(f"Zalogowano jako {bot.user}!")
 
-# --- 3. AUTOMATYCZNE POWITANIA ---
+# --- 3. AUTOMATYCZNE POWITANIA I BOOSTY ---
 @bot.event
 async def on_member_join(member):
     channel = discord.utils.get(member.guild.text_channels, name="wlc")
@@ -184,9 +181,33 @@ async def on_member_join(member):
             f"👤 **Username:** `{member.name}`\n"
             f"📅 **Joined at:** {joined_at_str}"
         )
-        embed.set_thumbnail(url="https://i.imgur.com/7Y1p3FH.png") 
+        embed.set_thumbnail(url=member.display_avatar.url) 
 
         await channel.send(embed=embed)
+
+@bot.event
+async def on_member_update(before, after):
+    if before.premium_since is None and after.premium_since is not None:
+        channel = discord.utils.get(after.guild.text_channels, name="wlc")
+        if channel:
+            boost_count = after.guild.premium_subscription_count
+            boost_tier = after.guild.premium_tier
+
+            embed = discord.Embed(
+                title="💎 New server Boost!",
+                description=f"{after.mention} **BOOST!**\nthe thanks for boosting our server!\n*Go check out our booster zone!*",
+                color=discord.Color.purple()
+            )
+            embed.set_thumbnail(url=after.display_avatar.url)
+            embed.add_field(
+                name="🚀 Boost level",
+                value=f"💎 Server Boost level: **{boost_tier}**\n🔢 Boost count: **{boost_count}**",
+                inline=False
+            )
+            if after.guild.banner:
+                embed.set_image(url=after.guild.banner.url)
+
+            await channel.send(embed=embed)
 
 # --- 4. KOMENDA !SAY ---
 @bot.command()
@@ -211,7 +232,7 @@ async def remove(ctx, member: discord.Member):
     else:
         await ctx.send("❌ Tej komendy można używać tylko na serwerze.")
 
-# --- KOMENDY SLASH (/BAN oraz /UNBAN) ---
+# --- KOMENDY SLASH (/BAN, /UNBAN oraz /MINIGAME) ---
 @bot.tree.command(name="ban", description="Banuje użytkownika na serwerze")
 @app_commands.describe(member="Użytkownik, którego chcesz zbanować", reason="Powód bana (opcjonalnie)")
 async def ban(interaction: discord.Interaction, member: discord.Member, reason: str = "Brak powodu"):
@@ -238,6 +259,24 @@ async def unban(interaction: discord.Interaction, user_id: str):
         await interaction.response.send_message(f"✅ Pomyślnie odbisno bana użytkownikowi {user.mention}!", ephemeral=True)
     except Exception as e:
         await interaction.response.send_message(f"❌ Wystąpił błąd. Upewnij się, że podajesz poprawne ID użytkownika.", ephemeral=True)
+
+@bot.tree.command(name="minigame", description="Zagraj o rangę .boosterzone (szansa 1 na 50!)")
+async def minigame(interaction: discord.Interaction):
+    roll = random.randint(1, 50)
+    
+    if roll == 1:
+        role = discord.utils.get(interaction.guild.roles, name=".boosterzone")
+        if not role:
+            await interaction.response.send_message("🎉 Wygrałeś, ale rola o nazwie `.boosterzone` nie istnieje na serwerze! Stwórz ją.", ephemeral=True)
+            return
+        
+        try:
+            await interaction.user.add_roles(role)
+            await interaction.response.send_message(f"🎉 **GRATULACJE!** Trafiłeś szczęśliwy los (1/50) i wygrałeś rangę **.boosterzone**! {interaction.user.mention}", ephemeral=False)
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Wystąpił błąd przy nadawaniu rangi: {e}", ephemeral=True)
+    else:
+        await interaction.response.send_message(f"😢 Niestety tym razem się nie udało! (Wylosowano numer {roll}/50). Spróbuj ponownie!", ephemeral=True)
 
 # --- KOMENDY SETUPUJĄCE PANELE ---
 @bot.command()
