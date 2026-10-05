@@ -291,7 +291,6 @@ async def minigame(interaction: discord.Interaction):
         await interaction.response.send_message("❌ Tej komendy można używać tylko na kanale #minigame!", ephemeral=True)
         return
     await interaction.response.send_message("🎮 Rozpoczęto minigrę! Powodzenia!")
-
 @bot.tree.command(name="wzor_staff", description="Show staff application template")
 async def wzor_staff(interaction: discord.Interaction):
     embed = discord.Embed(
