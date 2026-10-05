@@ -212,4 +212,57 @@ async def setup_ticket(interaction: discord.Interaction):
     await interaction.channel.send(embed=embed, view=TicketView())
     await interaction.response.send_message("✅ Wysłano panel ticketów!", ephemeral=True)
 
-@bot.tree.command(name="setup_partner", description="Wys
+@bot.tree.command(name="setup_partner", description="Wysyła panel partnerstw")
+async def setup_partner(interaction: discord.Interaction):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("❌ Brak uprawnień!", ephemeral=True)
+        return
+    
+    embed = discord.Embed(
+        title="🤝 Partnership / Współpraca",
+        description="Chcesz nawiązać partnerstwo z naszym serwerem? Kliknij przycisk poniżej, aby otworzyć kanał zgłoszeniowy.",
+        color=discord.Color.gold()
+    )
+    await interaction.channel.send(embed=embed, view=PartnerView())
+    await interaction.response.send_message("✅ Wysłano panel partnerstw!", ephemeral=True)
+
+@bot.tree.command(name="minigame", description="Rozpocznij minigrę")
+async def minigame(interaction: discord.Interaction):
+    if interaction.channel.name != "minigame":
+        await interaction.response.send_message("❌ Tej komendy można używać tylko na kanale #minigame!", ephemeral=True)
+        return
+    await interaction.response.send_message("🎮 Rozpoczęto minigrę! Powodzenia!")
+
+@bot.tree.command(name="wzor_staff", description="Wyświetla wzór podania na staff")
+async def wzor_staff(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="📝 Rekrutacja na Staff - Wzór",
+        description="Skopiuj poniższy wzór i wyślij go w odpowiednim kanale.",
+        color=discord.Color.blue()
+    )
+    embed.add_field(name="1. Wiek:", value="[Wpisz tutaj]", inline=False)
+    embed.add_field(name="2. Klipy/HL:", value="[Wpisz tutaj]", inline=False)
+    embed.add_field(name="3. Aktywność:", value="[Wpisz tutaj]", inline=False)
+    await interaction.response.send_message(embed=embed)
+
+@bot.tree.command(name="accept", description="Akceptuje kandydata i nadaje rangę Pure")
+@app_commands.describe(member="Użytkownik, którego chcesz zaakceptować")
+async def accept(interaction: discord.Interaction, member: discord.Member):
+    if not interaction.user.guild_permissions.manage_roles:
+        await interaction.response.send_message("❌ Nie masz uprawnień.", ephemeral=True)
+        return
+
+    role = interaction.guild.get_role(1540359963346608168)
+    if not role:
+        await interaction.response.send_message("❌ Nie znaleziono roli Pure (ID: 1540359963346608168)!", ephemeral=True)
+        return
+
+    try:
+        await member.add_roles(role)
+        await interaction.response.send_message(f"✅ Zaakceptowano użytkownika {member.mention} i nadano rangę Pure!")
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Błąd podczas nadawania roli: {e}", ephemeral=True)
+
+TOKEN = os.getenv("DISCORD_TOKEN")
+if TOKEN:
+    bot.run(TOKEN)
