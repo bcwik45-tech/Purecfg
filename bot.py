@@ -251,4 +251,4 @@ async def ban(interaction: discord.Interaction, member: discord.Member, reason: 
 @app_commands.describe(user_id="ID użytkownika, którego chcesz odbanować")
 async def unban(interaction: discord.Interaction, user_id: str):
     if not interaction.user.guild_permissions.ban_members:
-        await interaction.response.send_message("❌ Nie masz uprawn
+    await interaction.response.send_message("❌ Nie masz uprawnień, aby użyć tej komendy.", ephemeral=True)
