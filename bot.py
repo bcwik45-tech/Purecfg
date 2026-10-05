@@ -14,8 +14,7 @@ class PurecfgBot(commands.Bot):
         super().__init__(command_prefix="!", intents=intents)
 
     async def setup_hook(self):
-        # ⚠️ TUTAJ WKLEJ ID SWOJEGO SERWERA (zostawiając literkę d na początku, np. discord.Object(id=123456789012345678))
-        GUILD_ID = discord.Object(id=WSTAW_ID_SERWERA_TUTAJ)
+        GUILD_ID = discord.Object(id=1540347771616362638)
         
         self.tree.copy_global_to(guild=GUILD_ID)
         await self.tree.sync(guild=GUILD_ID)
