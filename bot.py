@@ -143,4 +143,4 @@ class TicketView(discord.ui.View):
 
     @discord.ui.button(label="Recruitment 📄", style=discord.ButtonStyle.danger, custom_id="ticket_recruitment")
     async def recruitment_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self
+        await self.create_ticket_channel(interaction, "recruitment", "📄", "Recruitment Ticket", "Hello! Welcome to Recruitment.\n**Want to join the staff?** Provide your details and experience below.\n\nTo close the ticket, click the
