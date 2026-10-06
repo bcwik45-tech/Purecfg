@@ -157,4 +157,17 @@ class TicketView(discord.ui.View):
         await self.create_ticket_channel(interaction, "support", "❓", "Support Ticket", "Hello! Welcome to Support.\n**What issue are you experiencing?** Describe it clearly and wait for the staff.\n\nTo close the ticket, click the button below.")
 
     @discord.ui.button(label="Recruitment 📄", style=discord.ButtonStyle.danger, custom_id="ticket_recruitment")
-    async def recruitment_button(self, interaction: discord.Interaction,
+    async def recruitment_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.create_ticket_channel(interaction, "recruitment", "📄", "Recruitment Ticket", "Hello! Welcome to Recruitment.\n**Want to join the staff?** Provide your details and experience below.\n\nTo close the ticket, click the button below.")
+
+class PartnerView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Partner 🤝", style=discord.ButtonStyle.primary, custom_id="purecfg_partner_button")
+    async def partner_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True)
+        guild = interaction.guild
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            interaction.user: discord.PermissionOverwrite(
