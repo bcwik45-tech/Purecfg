@@ -221,4 +221,183 @@ async def on_ready():
     print(f"Zalogowano jako {bot.user} (ID: {bot.user.id})")
 
 @bot.event
-async def on_member_join(member:
+async def on_member_join(member: discord.Member):
+    print(f"DEBUG: Zauważono nowego użytkownika: {member.name}")
+    
+    SPECIFIC_CHANNEL_ID = 1556280506516115466
+    target_channel = member.guild.get_channel(SPECIFIC_CHANNEL_ID)
+    
+    if not target_channel:
+        for channel in member.guild.text_channels:
+            if any(name in channel.name.lower() for name in ["powitania", "witamy", "welcome", "czesc"]):
+                target_channel = channel
+                break
+                
+    if not target_channel and member.guild.text_channels:
+        target_channel = member.guild.text_channels[0]
+
+    if target_channel:
+        created_at_str = member.created_at.strftime('%d.%m.%Y %H:%M:%S')
+        joined_at_str = member.joined_at.strftime('%d %B %Y %H:%M') if member.joined_at else "Nieznana"
+        member_count = member.guild.member_count
+
+        desc = (
+            f"🎉 Hi {member.mention}\n"
+            f"Welcome to the best cfg in Poland!\n"
+            f"Go check out our stuff!\n\n"
+            f"**You're our {member_count} member!**\n\n"
+            f"**Member Info:**\n"
+            f"🪪 **Discord account created:** {created_at_str}\n"
+            f"👤 **Username:** `{member.name}`\n"
+            f"📅 **Joined at:** {joined_at_str}"
+        )
+
+        embed = discord.Embed(
+            title="New member!",
+            description=desc,
+            color=discord.Color.from_rgb(47, 49, 54)
+        )
+        embed.set_thumbnail(url=member.display_avatar.url)
+        
+        try:
+            await target_channel.send(embed=embed)
+            print(f"DEBUG: Wysłano powitanie dla {member.name} na kanał #{target_channel.name}")
+        except Exception as e:
+            print(f"BŁĄD przy wysyłaniu powitania: {e}")
+    else:
+        print("BŁĄD: Nie znaleziono żadnego kanału tekstowego do wysłania powitania!")
+
+@bot.tree.command(name="setup_verify", description="Send verification panel")
+async def setup_verify(interaction: discord.Interaction):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("❌ Brak uprawnień!", ephemeral=True)
+        return
+    
+    embed = discord.Embed(
+        title="Verification",
+        description="Click on verification to get access to the channels",
+        color=discord.Color.green()
+    )
+    await interaction.channel.send(embed=embed, view=VerifyView())
+    await interaction.response.send_message("✅ Wysłano panel weryfikacji!", ephemeral=True)
+
+@bot.tree.command(name="setup_ticket", description="Send ticket panel")
+async def setup_ticket(interaction: discord.Interaction):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("❌ Brak uprawnień!", ephemeral=True)
+        return
+    
+    embed = discord.Embed(
+        title="🎫 Tickets",
+        description="Want to place an order, need to contact the owner or staff for help?\nClick the appropriate button below to open a private channel with the administration.\n\nPlease don't open the tickets without a proper reason.",
+        color=discord.Color.from_rgb(47, 49, 54)
+    )
+    await interaction.channel.send(embed=embed, view=TicketView())
+    await interaction.response.send_message("✅ Wysłano panel ticketów!", ephemeral=True)
+
+@bot.tree.command(name="setup_partner", description="Send partner panel")
+async def setup_partner(interaction: discord.Interaction):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("❌ Brak uprawnień!", ephemeral=True)
+        return
+    
+    embed = discord.Embed(
+        title="🤝 Partnership / Współpraca",
+        description="Chcesz nawiązać partnerstwo z naszym serwerem? Kliknij przycisk poniżej, aby otworzyć kanał zgłoszeniowy.",
+        color=discord.Color.gold()
+    )
+    await interaction.channel.send(embed=embed, view=PartnerView())
+    await interaction.response.send_message("✅ Wysłano panel partnerstw!", ephemeral=True)
+
+@bot.tree.command(name="add", description="Add user to active ticket")
+@app_commands.describe(member="Użytkownik, którego chcesz dodać")
+async def add_user(interaction: discord.Interaction, member: discord.Member):
+    if not any(interaction.channel.name.startswith(e) for e in ["🛒", "👑", "❓", "📄", "partner"]):
+        await interaction.response.send_message("❌ Tej komendy można używać tylko w kanałach ticketów!", ephemeral=True)
+        return
+
+    try:
+        await interaction.channel.set_permissions(member, view_channel=True, send_messages=True, read_message_history=True)
+        await interaction.response.send_message(f"✅ Dodano użytkownika {member.mention} do ticketa.")
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Wystąpił błąd: {e}", ephemeral=True)
+
+@bot.tree.command(name="remove", description="Remove user from active ticket")
+@app_commands.describe(member="Użytkownik, którego chcesz usunąć")
+async def remove_user(interaction: discord.Interaction, member: discord.Member):
+    if not any(interaction.channel.name.startswith(e) for e in ["🛒", "👑", "❓", "📄", "partner"]):
+        await interaction.response.send_message("❌ Tej komendy można używać tylko w kanałach ticketów!", ephemeral=True)
+        return
+
+    try:
+        await interaction.channel.set_permissions(member, overwrite=None)
+        await interaction.response.send_message(f"✅ Usunięto użytkownika {member.mention} z ticketa.")
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Wystąpił błąd: {e}", ephemeral=True)
+
+@bot.tree.command(name="minigame", description="Start minigame")
+async def minigame(interaction: discord.Interaction):
+    if interaction.channel.name != "minigame":
+        await interaction.response.send_message("❌ Tej komendy można używać tylko na kanale #minigame!", ephemeral=True)
+        return
+
+    today = datetime.now(timezone.utc).date()
+    user_id = interaction.user.id
+
+    if user_id in minigame_cooldowns and minigame_cooldowns[user_id] == today:
+        await interaction.response.send_message("⏳ Wykorzystałeś już swoją szansę na dziś! Kolejna próba odnowi się o północy.", ephemeral=True)
+        return
+
+    minigame_cooldowns[user_id] = today
+
+    await interaction.response.defer()
+
+    embed = discord.Embed(
+        title="🐱 We're sorry!",
+        description=f"{interaction.user.mention}, this time you didn't win anything. Try your luck again tomorrow!",
+        color=discord.Color.from_rgb(47, 49, 54)
+    )
+    embed.add_field(
+        name="Some Info",
+        value="*Your chance was **1 in 35**.*",
+        inline=False
+    )
+    embed.set_image(url="https://images-ext-1.discordapp.net/external/acfg_bial_bonsai_2.jpg")
+    
+    await interaction.followup.send(embed=embed, content="pure")
+
+@bot.tree.command(name="wzor_staff", description="Show staff application template")
+async def wzor_staff(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="📝 Rekrutacja na Staff - Wzór",
+        description="Skopiuj poniższy wzór i wyślij go w odpowiednim kanale.",
+        color=discord.Color.blue()
+    )
+    embed.add_field(name="1. Wiek:", value="[Wpisz tutaj]", inline=False)
+    embed.add_field(name="2. Klipy/HL:", value="[Wpisz tutaj]", inline=False)
+    embed.add_field(name="3. Aktywność:", value="[Wpisz tutaj]", inline=False)
+    await interaction.response.send_message(embed=embed)
+
+@bot.tree.command(name="accept", description="Accept candidate and give roles")
+@app_commands.describe(member="Użytkownik, którego chcesz zaakceptować")
+async def accept(interaction: discord.Interaction, member: discord.Member):
+    if not interaction.user.guild_permissions.manage_roles:
+        await interaction.response.send_message("❌ Nie masz uprawnień.", ephemeral=True)
+        return
+
+    role1 = interaction.guild.get_role(1540360086617063584)
+    role2 = interaction.guild.get_role(1540359963346608168)
+
+    if not role1 or not role2:
+        await interaction.response.send_message("❌ Nie znaleziono jednej lub obu ról na serwerze!", ephemeral=True)
+        return
+
+    try:
+        await member.add_roles(role1, role2)
+        await interaction.response.send_message(f"✅ Zaakceptowano użytkownika {member.mention} i nadano obie rangi!")
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Błąd podczas nadawania ról: {e}", ephemeral=True)
+
+TOKEN = os.getenv("DISCORD_TOKEN")
+if TOKEN:
+    bot.run(TOKEN)
