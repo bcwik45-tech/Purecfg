@@ -69,7 +69,7 @@ class VerifyView(discord.ui.View):
     async def verify_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer(ephemeral=True)
         
-        VERIFIED_ROLE_ID = 1540360249775493230  # Zaktualizowane ID roli
+        VERIFIED_ROLE_ID = 1540360249775493230
         role = interaction.guild.get_role(VERIFIED_ROLE_ID)
         
         if role:
@@ -77,9 +77,9 @@ class VerifyView(discord.ui.View):
                 await interaction.user.add_roles(role)
                 await interaction.followup.send("✅ Zostałeś pomyślnie zweryfikowany i nadano Ci rangę!", ephemeral=True)
             except Exception as e:
-                await interaction.followup.send(f"❌ Wystąpił błąd podczas nadawania roli (sprawdź uprawnienia bota i pozycję roli): {e}", ephemeral=True)
+                await interaction.followup.send(f"❌ Wystąpił błąd podczas nadawania roli: {e}", ephemeral=True)
         else:
-            await interaction.followup.send("❌ Nie znaleziono roli o podanym ID na serwerze! Upewnij się, że ID jest poprawne.", ephemeral=True)
+            await interaction.followup.send("❌ Nie znaleziono roli o podanym ID na serwerze!", ephemeral=True)
 
 class TicketView(discord.ui.View):
     def __init__(self):
@@ -150,44 +150,4 @@ class TicketView(discord.ui.View):
 
     @discord.ui.button(label="Owner 👑", style=discord.ButtonStyle.secondary, custom_id="ticket_owner")
     async def owner_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.create_ticket_channel(interaction, "owner", "👑", "Owner Ticket", "Hello! Welcome to the Owner contact.\n**How can the owner help you?** Please describe your case and wait for a response.\n\nTo close the ticket, click the button below.")
-
-    @discord.ui.button(label="Support ❓", style=discord.ButtonStyle.primary, custom_id="ticket_support")
-    async def support_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.create_ticket_channel(interaction, "support", "❓", "Support Ticket", "Hello! Welcome to Support.\n**What issue are you experiencing?** Describe it clearly and wait for the staff.\n\nTo close the ticket, click the button below.")
-
-    @discord.ui.button(label="Recruitment 📄", style=discord.ButtonStyle.danger, custom_id="ticket_recruitment")
-    async def recruitment_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.create_ticket_channel(interaction, "recruitment", "📄", "Recruitment Ticket", "Hello! Welcome to Recruitment.\n**Want to join the staff?** Provide your details and experience below.\n\nTo close the ticket, click the button below.")
-
-class PartnerView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-
-    @discord.ui.button(label="Partner 🤝", style=discord.ButtonStyle.primary, custom_id="purecfg_partner_button")
-    async def partner_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.defer(ephemeral=True)
-        guild = interaction.guild
-        overwrites = {
-            guild.default_role: discord.PermissionOverwrite(view_channel=False),
-            interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True),
-            guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True)
-        }
-        
-        category = None
-        for cat in guild.categories:
-            if "partner" in cat.name.lower():
-                category = cat
-                break
-        if not category:
-            category = interaction.channel.category
-        
-        try:
-            channel = await guild.create_text_channel(f"partner-{interaction.user.name}", overwrites=overwrites, category=category)
-            
-            roles_to_ping = []
-            targets_to_check = list(channel.overwrites.items())
-            if category:
-                targets_to_check.extend(list(category.overwrites.items()))
-
-            for target, overwrite in
+        await self.
