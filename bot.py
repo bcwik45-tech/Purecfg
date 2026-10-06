@@ -290,7 +290,22 @@ async def minigame(interaction: discord.Interaction):
     if interaction.channel.name != "minigame":
         await interaction.response.send_message("❌ Tej komendy można używać tylko na kanale #minigame!", ephemeral=True)
         return
-    await interaction.response.send_message("🎮 Rozpoczęto minigrę! Powodzenia!")
+
+    embed = discord.Embed(
+        title="🐱 We're sorry!",
+        description=f"{interaction.user.mention}, this time you didn't win anything. Try your luck again tomorrow!",
+        color=discord.Color.from_rgb(47, 49, 54)
+    )
+    embed.add_field(
+        name="Some Info",
+        value="*Your chance was **1 in 35**.*",
+        inline=False
+    )
+    # TUTAJ WKLEJ LINK BEZPOŚREDNI DO SWOJEGO OBRAZKA Z NAPISEM PURECFG (np. z Imgura lub wysłany na Discordzie)
+    embed.set_image(url="TUTAJ_WKLEJ_LINK_BEZPOSREDNI_DO_OBRAZKA")
+    
+    await interaction.response.send_message(embed=embed, content="pure")
+
 @bot.tree.command(name="wzor_staff", description="Show staff application template")
 async def wzor_staff(interaction: discord.Interaction):
     embed = discord.Embed(
