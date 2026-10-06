@@ -67,7 +67,18 @@ class VerifyView(discord.ui.View):
 
     @discord.ui.button(label="Zweryfikuj", style=discord.ButtonStyle.green, custom_id="purecfg_verify_button")
     async def verify_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("✅ Zostałeś pomyślnie zweryfikowany!", ephemeral=True)
+        # Tutaj możesz wpisać ID roli zweryfikowanego użytkownika:
+        VERIFIED_ROLE_ID = 1540360086617063584  # <--- Podmień na właściwe ID roli weryfikacji, jeśli inne
+        
+        role = interaction.guild.get_role(VERIFIED_ROLE_ID)
+        if role:
+            try:
+                await interaction.user.add_roles(role)
+                await interaction.response.send_message("✅ Zostałeś pomyślnie zweryfikowany i nadano Ci rangę!", ephemeral=True)
+            except Exception as e:
+                await interaction.response.send_message(f"❌ Wystąpił błąd podczas nadawania roli: {e}", ephemeral=True)
+        else:
+            await interaction.response.send_message("✅ Zostałeś pomyślnie zweryfikowany!", ephemeral=True)
 
 class TicketView(discord.ui.View):
     def __init__(self):
@@ -366,7 +377,7 @@ async def minigame(interaction: discord.Interaction):
     
     await interaction.followup.send(embed=embed, content="pure")
 
-@bot.tree.command(name="wzor_staff", description="Show staff application template")
+@bot.tree.command(name="wzor_staff", description="State staff application template")
 async def wzor_staff(interaction: discord.Interaction):
     embed = discord.Embed(
         title="📝 Rekrutacja na Staff - Wzór",
