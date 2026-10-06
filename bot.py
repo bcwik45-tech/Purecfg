@@ -224,12 +224,12 @@ async def on_ready():
 async def on_member_join(member: discord.Member):
     print(f"DEBUG: Zauważono nowego użytkownika: {member.name}")
     
-    SPECIFIC_CHANNEL_ID = None
+    # Przypisane konkretne ID kanału powitań
+    SPECIFIC_CHANNEL_ID = 1556280506516115466
     
-    target_channel = None
-    if SPECIFIC_CHANNEL_ID:
-        target_channel = member.guild.get_channel(SPECIFIC_CHANNEL_ID)
+    target_channel = member.guild.get_channel(SPECIFIC_CHANNEL_ID)
     
+    # Awaryjne szukanie, gdyby kanał o tym ID nie został znaleziono
     if not target_channel:
         for channel in member.guild.text_channels:
             if any(name in channel.name.lower() for name in ["powitania", "witamy", "welcome", "czesc"]):
