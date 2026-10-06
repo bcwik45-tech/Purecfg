@@ -3,11 +3,15 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 import io
+from datetime import datetime, timezone
 
 intents = discord.Intents.default()
 intents.message_content = True
 intents.guilds = True
 intents.members = True
+
+# Słownik przechowujący datę ostatniego użycia minigry przez użytkownika
+minigame_cooldowns = {}
 
 class CloseTicketView(discord.ui.View):
     def __init__(self):
@@ -291,6 +295,16 @@ async def minigame(interaction: discord.Interaction):
         await interaction.response.send_message("❌ Tej komendy można używać tylko na kanale #minigame!", ephemeral=True)
         return
 
+    # Pobieramy dzisiejszą datę (UTC) do obsługi dziennego cooldownu
+    today = datetime.now(timezone.utc).date()
+    user_id = interaction.user.id
+
+    if user_id in minigame_cooldowns and minigame_cooldowns[user_id] == today:
+        await interaction.response.send_message("⏳ Wykorzystałeś już swoją szansę na dziś! Kolejna próba odnowi się o północy.", ephemeral=True)
+        return
+
+    minigame_cooldowns[user_id] = today
+
     await interaction.response.defer()
 
     embed = discord.Embed(
@@ -303,7 +317,8 @@ async def minigame(interaction: discord.Interaction):
         value="*Your chance was **1 in 35**.*",
         inline=False
     )
-    embed.set_image(url="https://images-ext-1.discordapp.net/external/acfg_bial_bonsai.jpg")
+    # Podstawiono link do zaktualizowanego obrazka z napisem PURECFG[cite: 9]
+    embed.set_image(url="https://images-ext-1.discordapp.net/external/acfg_bial_bonsai_2.jpg")
     
     await interaction.followup.send(embed=embed, content="pure")
 
