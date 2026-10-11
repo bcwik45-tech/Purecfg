@@ -1,336 +1,332 @@
-import discord
-from discord.ext import commands, tasks
-from discord import app_commands
-import random
-import asyncio
-import os
-from datetime import date
+const { 
+    Client, 
+    GatewayIntentBits, 
+    EmbedBuilder, 
+    SlashCommandBuilder, 
+    ActionRowBuilder, 
+    ButtonBuilder, 
+    ButtonStyle, 
+    REST, 
+    Routes,
+    PermissionFlagsBits,
+    ChannelType
+} = require('discord.js');
 
-intents = discord.Intents.default()
-intents.members = True
-intents.message_content = True
+const client = new Client({
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildBans
+    ]
+});
 
-bot = commands.Bot(command_prefix="!", intents=intents)
+// --- KONFIGURACJA ID ---
+const WELCOME_CHANNEL_ID = '1556280506516115466'; // Kanał powitań
+const BANNER_URL = 'https://i.imgur.com/YOUR_BANNER_HERE.png'; // Zmień na link do swojego głównego bannera
 
-COLDCFG_BANNER = "https://i.imgur.com/your_coldcfg_banner.png"
-MINIGAME_BANNER = "TUTAJ_WKLEJ_LINK_DO_OBRAZKA_Z_NAPISEM_COLDCFG"
-COLDCFG_BOOST_BANNER = "https://i.imgur.com/your_coldcfg_boosts.png"
-THUMBNAIL_URL = "https://i.imgur.com/your_thumbnail.png"
+// Kategorie ticketów
+const TICKET_CATEGORIES = {
+    shop: '1556300130892906506',
+    owner: '1556300080355606608',
+    support: '1556300180624769105',
+    recruitment: '1556300236526329936',
+    partner: '1556383124424892606'
+};
 
-# ==========================================
-# ID KANAŁÓW POWITAŃ I BOOSTÓW
-# ==========================================
-WELCOME_CHANNEL_ID = 1556280506516115466
-BOOST_CHANNEL_ID = 1540358387219304592
+// Role mające dostęp do poszczególnych ticketów
+const TICKET_ROLES = {
+    shop: ['1540359821323149392'],
+    owner: ['1540359821323149392', '1540495893399081061'],
+    support: ['1540359821323149392', '1540495893399081061', '1556062543963750400', '1540359905175801946', '1540360086617063584'],
+    recruitment: ['1540359821323149392', '1540495893399081061', '1556062543963750400', '1540359905175801946'],
+    partner: ['1540359821323149392', '1540495893399081061']
+};
 
-MINIGAME_CHANNEL_ID = 1556566161653764157
-MINIGAME_WIN_ROLE_ID = 1556565240832073779
+// Role nadawane przez /accept
+const ACCEPT_ROLES = ['1540359963346608168', '1540360086617063584'];
 
-ROLE_VERIFIED_ID = 1540360249775493230
+// Rejestracja komend Slash
+const commands = [
+    new SlashCommandBuilder()
+        .setName('say')
+        .setDescription('Wysyła wiadomość w imieniu bota')
+        .addStringOption(option => option.setName('message').setDescription('Treść').setRequired(true)),
+    new SlashCommandBuilder()
+        .setName('bandc')
+        .setDescription('Banuje użytkownika')
+        .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
+        .addUserOption(option => option.setName('target').setDescription('Użytkownik').setRequired(true))
+        .addStringOption(option => option.setName('reason').setDescription('Powód').setRequired(true)),
+    new SlashCommandBuilder()
+        .setName('unbandc')
+        .setDescription('Odbanowuje użytkownika')
+        .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
+        .addStringOption(option => option.setName('userid').setDescription('ID użytkownika').setRequired(true))
+        .addStringOption(option => option.setName('reason').setDescription('Powód').setRequired(false)),
+    new SlashCommandBuilder()
+        .setName('minigame')
+        .setDescription('Losowanie nagrody w grze Cold Cfg'),
+    new SlashCommandBuilder()
+        .setName('accept')
+        .setDescription('Nadaje role zweryfikowanemu użytkownikowi')
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
+        .addUserOption(option => option.setName('target').setDescription('Użytkownik').setRequired(true)),
+    new SlashCommandBuilder()
+        .setName('setup')
+        .setDescription('Wysyła panele weryfikacji oraz ticketów')
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+].map(command => command.toJSON());
 
-# ==========================================
-# LISTY RÓL DLA POSZCZEGÓLNYCH TICKETÓW
-# ==========================================
-ROLES_OWNER = [1540359821323149392, 1540495893399081061]
-ROLES_SHOP = [1540359821323149392]
-ROLES_SUPPORT = [1540360086617063584, 1540359905175801946, 1556062543963750400, 1540495893399081061, 1540359821323149392]
-ROLES_RECRUITMENT = [1540359821323149392, 1540495893399081061, 1556062543963750400, 1540359905175801946]
-ROLES_PARTNER = [1540359821323149392, 1540495893399081061]
+client.once('ready', async () => {
+    console.log(`Zalogowano jako ${client.user.tag}!`);
+    const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
+    try {
+        await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
+        console.log('Zarejestrowano komendy slash.');
+    } catch (e) {
+        console.error(e);
+    }
+});
 
-# ==========================================
-# ID KATEGORII NA DISCORDZIE DLA TICKETÓW
-# ==========================================
-CATEGORY_OWNER_ID = 1556300080355606608
-CATEGORY_SHOP_ID = 1556300130892906506
-CATEGORY_SUPPORT_ID = 1556300180624769105
-CATEGORY_RECRUITMENT_ID = 1556300236526329936
-CATEGORY_PARTNER_ID = 1556383124424892606
+// --- POWITANIA (guildMemberAdd) ---
+client.on('guildMemberAdd', async (member) => {
+    const channel = member.guild.channels.cache.get(WELCOME_CHANNEL_ID);
+    if (!channel) return;
 
-minigame_cooldowns = {}
+    const createdAt = `<t:${Math.floor(member.user.createdTimestamp / 1000)}:d> <t:${Math.floor(member.user.createdTimestamp / 1000)}:T>`;
+    const joinedAt = `<t:${Math.floor(member.joinedTimestamp / 1000)}:d> <t:${Math.floor(member.joinedTimestamp / 1000)}:T>`;
 
+    const welcomeEmbed = new EmbedBuilder()
+        .setColor('#2b2d31')
+        .setTitle('New member!')
+        .setDescription(
+            `🎉 Hi\n<@!${member.id}>\n` +
+            `Welcome to the best cfg in Poland!\n` +
+            `Go check out our stuff!\n\n` +
+            `**You're our ${member.guild.memberCount} member!**\n\n` +
+            `**Member Info:**\n` +
+            `🪪 **Discord account created:**\n${createdAt}\n` +
+            `👤 **Username:** \`${member.user.username}\`\n` +
+            `📅 **Joined at:** ${joinedAt}`
+        )
+        .setThumbnail(member.guild.iconURL({ dynamic: true }) || client.user.displayAvatarURL());
 
-class VerifyView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
+    channel.send({ embeds: [welcomeEmbed] });
+});
 
-    @discord.ui.button(label="Zweryfikuj", style=discord.ButtonStyle.success, custom_id="verify_button")
-    async def verify_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.defer(ephemeral=True)
-        role = interaction.guild.get_role(ROLE_VERIFIED_ID)
-        if role:
-            if role in interaction.user.roles:
-                await interaction.followup.send("❌ Jesteś już zweryfikowany!", ephemeral=True)
-            else:
-                await interaction.user.add_roles(role)
-                await interaction.followup.send("✅ Pomyślnie zweryfikowano! Otrzymałeś dostęp do kanałów.", ephemeral=True)
-        else:
-            await interaction.followup.send("❌ Błąd: Nie znaleziono roli do weryfikacji.", ephemeral=True)
+// --- BOOSTY SERWERA ---
+client.on('guildMemberUpdate', async (oldMember, newMember) => {
+    if (!oldMember.premiumSince && newMember.premiumSince) {
+        const channel = newMember.guild.systemChannel || newMember.guild.channels.cache.find(ch => ch.type === ChannelType.GuildText);
+        if (!channel) return;
 
+        const boostEmbed = new EmbedBuilder()
+            .setColor('#ff73fa')
+            .setTitle('💎 New server Boost!')
+            .setDescription(
+                `<@!${newMember.id}> **BOOST!**\n` +
+                `> thanks for boosting our server!\n` +
+                `> Go check out our booster zone!\n\n` +
+                `**Boost Info:**\n` +
+                `🧊 Server Boost level: \`${newMember.guild.premiumTier}\`\n` +
+                `🔢 Boost count: \`${newMember.guild.premiumSubscriptionCount}\``
+            )
+            .setThumbnail(newMember.user.displayAvatarURL({ dynamic: true }))
+            .setImage(BANNER_URL);
 
-class CloseTicketView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
+        channel.send({ embeds: [boostEmbed] });
+    }
+});
 
-    @discord.ui.button(label="Close Ticket 🔒", style=discord.ButtonStyle.red, custom_id="close_ticket_btn")
-    async def close_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("🔒 Ten ticket zostanie zamknięty za 5 sekund...")
-        await asyncio.sleep(5)
-        await interaction.channel.delete()
-
-
-class TicketSystemView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-
-    async def create_ticket_channel(self, interaction: discord.Interaction, ticket_type: str, role_ids: list, category_id: int, emoji: str):
-        await interaction.response.defer(ephemeral=True)
-
-        guild = interaction.guild
-        user = interaction.user
-        category = guild.get_channel(category_id)
-
-        overwrites = {
-            guild.default_role: discord.PermissionOverwrite(read_messages=False),
-            user: discord.PermissionOverwrite(read_messages=True, send_messages=True),
-            guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True)
+// --- OBSŁUGA INTERAKCJI (Komendy oraz Przyciski) ---
+client.on('interactionCreate', async (interaction) => {
+    
+    // Obsługa Przycisków (Weryfikacja oraz Tickety)
+    if (interaction.isButton()) {
+        // Weryfikacja (Przycisk "Zweryfikuj")
+        if (interaction.customId === 'verify_btn') {
+            const roleId = ACCEPT_ROLES[0]; // Możesz dopasować główną rolę weryfikacji
+            const member = interaction.member;
+            if (member.roles.cache.has(roleId)) {
+                return interaction.reply({ content: 'Jesteś już zweryfikowany!', ephemeral: true });
+            }
+            try {
+                await member.roles.add(roleId);
+                await interaction.reply({ content: 'Pomyślnie zweryfikowano!', ephemeral: true });
+            } catch (e) {
+                interaction.reply({ content: 'Błąd podczas nadawania roli.', ephemeral: true });
+            }
         }
-        
-        roles_mentions = []
-        for r_id in role_ids:
-            role = guild.get_role(r_id)
-            if role:
-                overwrites[role] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
-                roles_mentions.append(role.mention)
 
-        channel_name = f"{emoji}-{ticket_type.lower()}-{user.name}"
-        target_category = category if isinstance(category, discord.CategoryChannel) else None
+        // System Ticketów (Tworzenie kanału)
+        if (interaction.customId.startsWith('ticket_')) {
+            const ticketType = interaction.customId.replace('ticket_', '');
+            const categoryId = TICKET_CATEGORIES[ticketType];
+            const allowedRoles = TICKET_ROLES[ticketType] || [];
 
-        channel = await guild.create_text_channel(
-            name=channel_name, 
-            overwrites=overwrites, 
-            category=target_category
-        )
+            await interaction.deferReply({ ephemeral: true });
 
-        role_ping_str = " ".join(roles_mentions) if roles_mentions else "@here"
-        embed_color = 0xf1c40f if ticket_type == "Partnership" else 0x3498db
+            try {
+                // Konfiguracja uprawnień kanału ticketu
+                const permissionOverwrites = [
+                    {
+                        id: interaction.guild.id,
+                        deny: [PermissionFlagsBits.ViewChannel]
+                    },
+                    {
+                        id: interaction.user.id,
+                        allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory]
+                    },
+                    {
+                        id: client.user.id,
+                        allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageChannels]
+                    }
+                ];
 
-        embed = discord.Embed(
-            title=f"🎫 Ticket - {ticket_type}",
-            description=f"Witaj {user.mention}!\nOpisz swój problem lub zapytanie. Administracja niedługo Ci odpowie.",
-            color=embed_color
-        )
-        
-        await channel.send(content=f"{user.mention} {role_ping_str}", embed=embed, view=CloseTicketView())
-        await interaction.followup.send(f"✅ Twój ticket został utworzony: {channel.mention}", ephemeral=True)
+                // Dodanie uprawnień dla ról administracyjnych obsługujących dany ticket
+                allowedRoles.forEach(roleId => {
+                    permissionOverwrites.push({
+                        id: roleId,
+                        allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory]
+                    });
+                });
 
-    @discord.ui.button(label="Shop 🛒", style=discord.ButtonStyle.success, custom_id="btn_shop")
-    async def shop_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.create_ticket_channel(interaction, "Shop", ROLES_SHOP, CATEGORY_SHOP_ID, "🛒")
+                const channelName = `ticket-${ticketType}-${interaction.user.username}`.toLowerCase();
+                const ticketChannel = await interaction.guild.channels.create({
+                    name: channelName,
+                    type: ChannelType.GuildText,
+                    parent: categoryId || null,
+                    permissionOverwrites: permissionOverwrites
+                });
 
-    @discord.ui.button(label="Owner 👑", style=discord.ButtonStyle.secondary, custom_id="btn_owner")
-    async def owner_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.create_ticket_channel(interaction, "Owner", ROLES_OWNER, CATEGORY_OWNER_ID, "👑")
+                // Przygotowanie pingu ról
+                const rolePings = allowedRoles.map(r => `<@&${r}>`).join(' ');
 
-    @discord.ui.button(label="Support ❓", style=discord.ButtonStyle.primary, custom_id="btn_support")
-    async def support_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.create_ticket_channel(interaction, "Support", ROLES_SUPPORT, CATEGORY_SUPPORT_ID, "❓")
+                const ticketEmbed = new EmbedBuilder()
+                    .setColor('#2b2d31')
+                    .setTitle(`Ticket: ${ticketType.toUpperCase()}`)
+                    .setDescription(`Witaj <@!${interaction.user.id}>!\nAdministracja wkrótce odpowie na Twoje zgłoszenie.`);
 
-    @discord.ui.button(label="Recruitment 📄", style=discord.ButtonStyle.danger, custom_id="btn_recruitment")
-    async def recruitment_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.create_ticket_channel(interaction, "Recruitment", ROLES_RECRUITMENT, CATEGORY_RECRUITMENT_ID, "📄")
+                await ticketChannel.send({ 
+                    content: `${rolePings} <@!${interaction.user.id}>`, 
+                    embeds: [ticketEmbed] 
+                });
 
-    @discord.ui.button(label="Partnership 🤝", style=discord.ButtonStyle.secondary, custom_id="btn_partnership")
-    async def partnership_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.create_ticket_channel(interaction, "Partnership", ROLES_PARTNER, CATEGORY_PARTNER_ID, "🤝")
+                await interaction.editReply({ content: `Utworzono Twój ticket: <#${ticketChannel.id}>` });
+            } catch (e) {
+                console.error(e);
+                await interaction.editReply({ content: 'Wystąpił błąd podczas tworzenia kanału ticketu.' });
+            }
+        }
+        return;
+    }
 
+    if (!interaction.isChatInputCommand()) return;
+    const { commandName } = interaction;
 
-@tasks.loop(hours=2)
-async def minigame_reminder():
-    channel = bot.get_channel(MINIGAME_CHANNEL_ID)
-    if channel:
-        guild = channel.guild
-        role = guild.get_role(ROLE_VERIFIED_ID)
-        role_ping = role.mention if role else f"<@&{ROLE_VERIFIED_ID}>"
+    // --- /say ---
+    if (commandName === 'say') {
+        const msg = interaction.options.getString('message');
+        const embed = new EmbedBuilder().setColor('#2b2d31').setDescription(msg)
+            .setFooter({ text: `${client.user.username} • Today, Ad made by ${interaction.user.username}` });
+        await interaction.reply({ embeds: [embed] });
+    }
 
-        embed = discord.Embed(
-            title="🎮 Daily Minigame Reminder!",
-            description="Hey everyone! Don't forget to test your luck today with `/minigame`! Win amazing rewards and a special role!",
-            color=0x3498db
-        )
-        embed.set_image(url=MINIGAME_BANNER)
-        await channel.send(content=role_ping, embed=embed)
+    // --- /bandc ---
+    if (commandName === 'bandc') {
+        const target = interaction.options.getUser('target');
+        const reason = interaction.options.getString('reason');
+        await interaction.guild.members.ban(target, { reason });
+        const embed = new EmbedBuilder().setColor('#ff0000').setTitle('🔨 User has been banned for life')
+            .addFields(
+                { name: '👤 User', value: `<@!${target.id}>`, inline: true },
+                { name: '🆔 ID', value: `\`${target.id}\``, inline: true },
+                { name: '🛡️ Administrator', value: `<@${interaction.user.id}>`, inline: false },
+                { name: '📝 Reason', value: `\`\`\`\n${reason}\n\`\`\``, inline: false }
+            ).setImage(BANNER_URL);
+        await interaction.reply({ embeds: [embed] });
+    }
 
-@minigame_reminder.before_loop
-async def before_minigame_reminder():
-    await bot.wait_until_ready()
+    // --- /unbandc ---
+    if (commandName === 'unbandc') {
+        const userId = interaction.options.getString('userid');
+        const reason = interaction.options.getString('reason') || 'Brak powody';
+        await interaction.guild.members.unban(userId, reason);
+        const embed = new EmbedBuilder().setColor('#00ff00').setTitle('🔓 User has been unbanned')
+            .addFields(
+                { name: '👤 User', value: `<@!${userId}>`, inline: true },
+                { name: '🆔 ID', value: `\`${userId}\``, inline: true },
+                { name: '🛡️ Administrator', value: `<@${interaction.user.id}>`, inline: false },
+                { name: '📝 Reason', value: `\`\`\`\n${reason}\n\`\`\``, inline: false }
+            ).setImage(BANNER_URL);
+        await interaction.reply({ embeds: [embed] });
+    }
 
-
-@bot.event
-async def on_ready():
-    print(f"✅ Coldcfg Bot zalogowany jako {bot.user.name}")
-    bot.add_view(VerifyView())
-    bot.add_view(TicketSystemView())
-    bot.add_view(CloseTicketView())
-    
-    if not minigame_reminder.is_running():
-        minigame_reminder.start()
-
-    try:
-        synced = await bot.tree.sync()
-        print(f"⚡ Zsynchronizowano {len(synced)} komend slash.")
-    except Exception as e:
-        print(f"❌ Błąd synchronizacji komend: {e}")
-
-
-@bot.tree.command(name="setup_weryfikacja", description="Tworzy panel weryfikacji na kanale.")
-@app_commands.checks.has_permissions(administrator=True)
-async def setup_weryfikacja(interaction: discord.Interaction):
-    embed = discord.Embed(
-        title="Verification",
-        description="Click on verification to get access to the channels",
-        color=discord.Color.green()
-    )
-    await interaction.channel.send(embed=embed, view=VerifyView())
-    await interaction.response.send_message("✅ Panel weryfikacji został wysłany!", ephemeral=True)
-
-
-@bot.tree.command(name="setup_ticket", description="Tworzy panel wszystkich ticketów na kanale.")
-@app_commands.checks.has_permissions(administrator=True)
-async def setup_ticket(interaction: discord.Interaction):
-    embed = discord.Embed(
-        title="🎟️ Tickets",
-        description="Want to place an order, need to contact the owner or staff for help?\nClick the appropriate button below to open a private channel with the administration.\n\nPlease don't open the tickets without a proper reason.",
-        color=0x3498db
-    )
-    await interaction.channel.send(embed=embed, view=TicketSystemView())
-    await interaction.response.send_message("✅ Panel ticketów został wysłany!", ephemeral=True)
-
-
-@bot.tree.command(name="minigame", description="Zagraj w minigrę i sprawdź swoje szczęście!")
-async def minigame(interaction: discord.Interaction):
-    if interaction.channel.id != MINIGAME_CHANNEL_ID:
-        await interaction.response.send_message(f"❌ Tej komendy można używać wyłącznie na kanale <#{MINIGAME_CHANNEL_ID}>!", ephemeral=True)
-        return
-
-    await interaction.response.defer()
-
-    today = date.today()
-    if minigame_cooldowns.get(interaction.user.id) == today:
-        await interaction.followup.send("❌ Wykorzystałeś już swoją dzisiejszą próbę w minigrze! Spróbuj ponownie jutro (cooldown odnawia się o północy).", ephemeral=True)
-        return
-
-    minigame_cooldowns[interaction.user.id] = today
-
-    win = random.randint(1, 35) == 1
-
-    if win:
-        role = interaction.guild.get_role(MINIGAME_WIN_ROLE_ID)
-        if role:
-            try:
-                await interaction.user.add_roles(role)
-            except Exception:
-                pass
-
-        embed = discord.Embed(
-            title="🐱 Congratulations!",
-            description=f"{interaction.user.mention}, **YOU WON!** 🎉\nYou hit the 1 in 35 chance and received a special role!",
-            color=discord.Color.green()
-        )
-    else:
-        embed = discord.Embed(
-            title="🐱 We're sorry!",
-            description=f"{interaction.user.mention}, **this time you didn't win anything.** Try your luck again tomorrow!\n\n**Some Info:**\n*Your chance was **1** in **35**.*\n\n*We wish you better luck next time!*",
-            color=0x2b2d31
-        )
-
-    embed.set_thumbnail(url=interaction.user.display_avatar.url)
-    embed.set_image(url=MINIGAME_BANNER)
-    
-    await interaction.followup.send(embed=embed)
-
-
-@bot.tree.command(name="say", description="Wyślij wiadomość w czytelnej ramce (Embed).")
-@app_commands.describe(wiadomosc="Treść wiadomości do wysłania")
-async def say(interaction: discord.Interaction, wiadomosc: str):
-    embed = discord.Embed(description=wiadomosc, color=0x2b2d31)
-    embed.set_footer(text=f"Coldcfg • Today, Ad made by {interaction.user.display_name}")
-    await interaction.response.send_message(embed=embed)
-
-
-@bot.tree.command(name="bandc", description="Banuje użytkownika i tworzy raport o banie.")
-@app_commands.describe(user="Użytkownik do zabanowania", reason="Powód bana")
-@app_commands.checks.has_permissions(ban_members=True)
-async def bandc(interaction: discord.Interaction, user: discord.Member, reason: str = "mrbeast"):
-    embed = discord.Embed(title="🔨 User has been banned for life", color=discord.Color.red())
-    embed.add_field(name="👤 User", value=user.mention, inline=True)
-    embed.add_field(name="🆔 ID", value=f"`{user.id}`", inline=True)
-    embed.add_field(name="🛡️ Administrator", value=interaction.user.mention, inline=False)
-    embed.add_field(name="📝 Reason", value=f"```\n{reason}\n```", inline=False)
-    embed.set_image(url=COLDCFG_BANNER)
-    embed.set_footer(text="COLDCFG Security")
-
-    try:
-        await user.ban(reason=f"{reason} (Wystawił: {interaction.user})")
-        await interaction.response.send_message(embed=embed)
-    except Exception as e:
-        await interaction.response.send_message(f"❌ Nie udało się zabanować: {e}", ephemeral=True)
-
-
-@bot.event
-async def on_member_join(member: discord.Member):
-    channel = member.guild.get_channel(WELCOME_CHANNEL_ID)
-    if channel:
-        created_at = member.created_at.strftime("%d.%m.%Y %H:%M:%S")
-        joined_at = member.joined_at.strftime("%d %B %Y %H:%M") if member.joined_at else "Now"
-
-        desc = (
-            "🎉 Hi\n" + member.mention + "\n"
-            "Welcome to the best cfg in Poland!\n"
-            "Go check out our stuff!\n\n"
-            "**You're our " + str(member.guild.member_count) + " member!**\n\n"
-            "**Member Info:**\n"
-            "🪪 **Discord account created:**\n" + created_at + "\n"
-            "👤 **Username:** `" + member.name + "`\n"
-            "📅 **Joined at:** " + joined_at
-        )
-
-        embed = discord.Embed(
-            title="New member!",
-            description=desc,
-            color=0x2b2d31
-        )
-        embed.set_thumbnail(url=member.display_avatar.url)
-        await channel.send(embed=embed)
-
-
-@bot.event
-async def on_member_update(before: discord.Member, after: discord.Member):
-    if before.premium_since is None and after.premium_since is not None:
-        channel = after.guild.get_channel(BOOST_CHANNEL_ID)
-        if channel:
-            guild = after.guild
-            
-            boost_desc = (
-                f"{after.mention} **BOOST!**\n"
-                "> thanks for boosting our server!\n"
-                "> Go check out our booster zone!\n\n"
-                "**Boost Info:**\n"
-                f"🧊 **Server Boost level:** `{guild.premium_tier}`\n"
-                f"🔢 **Boost count:** `{guild.premium_subscription_count}`"
+    // --- /minigame ---
+    if (commandName === 'minigame') {
+        const embed = new EmbedBuilder()
+            .setColor('#2b2d31')
+            .setTitle("🐱 We're sorry!")
+            .setDescription(
+                `<@!${interaction.user.id}>, this time you didn't win anything. Try your luck again tomorrow!\n\n` +
+                `**Some Info:**\n` +
+                `*Your chance was* **1** *in* **35**.\n\n` +
+                `*We wish you better luck next time!*`
             )
-            
-            embed = discord.Embed(
-                title="⚙️ New server Boost!",
-                description=boost_desc,
-                color=0xff73fa
-            )
-            embed.set_thumbnail(url=after.display_avatar.url)
-            embed.set_image(url=COLDCFG_BOOST_BANNER)
-            await channel.send(embed=embed)
+            .setThumbnail(interaction.user.displayAvatarURL({ dynamic: true }))
+            .setImage(BANNER_URL); // Użyje głównego bannera (możesz podmienić na osobny link)
 
+        await interaction.reply({ embeds: [embed] });
+    }
 
-TOKEN = os.getenv("DISCORD_TOKEN")
-if TOKEN:
-    bot.run(TOKEN)
-else:
-    print("❌ BŁĄD: Brak zmiennej DISCORD_TOKEN w Variables na Railway!")
+    // --- /accept ---
+    if (commandName === 'accept') {
+        const targetMember = interaction.options.getMember('target');
+        try {
+            await targetMember.roles.add(ACCEPT_ROLES);
+            await interaction.reply({ content: `Pomyślnie nadano role użytkownikowi <@!${targetMember.id}>!`, ephemeral: true });
+        } catch (e) {
+            await interaction.reply({ content: 'Nie udało się nadać ról. Sprawdź uprawnienia bota.', ephemeral: true });
+        }
+    }
+
+    // --- /setup (Wysyła panel weryfikacji i ticketów na kanał) ---
+    if (commandName === 'setup') {
+        // Panel weryfikacji
+        const verifyEmbed = new EmbedBuilder()
+            .setColor('#2ecc71')
+            .setTitle('Verification')
+            .setDescription('Click on verification to get access to the channels');
+        
+        const verifyRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('verify_btn').setLabel('Zweryfikuj').setStyle(ButtonStyle.Success)
+        );
+
+        // Panel ticketów
+        const ticketEmbed = new EmbedBuilder()
+            .setColor('#3498db')
+            .setTitle('🎫 Tickets')
+            .setDescription(
+                'Want to place an order, need to contact the owner or staff for help?\n' +
+                'Click the appropriate button below to open a private channel with the administration.\n\n' +
+                "Please don't open the tickets without a proper reason."
+            );
+
+        const ticketRow1 = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('ticket_shop').setLabel('Shop 🛒').setStyle(ButtonStyle.Success),
+            new ButtonBuilder().setCustomId('ticket_owner').setLabel('Owner 👑').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId('ticket_support').setLabel('Support ❓').setStyle(ButtonStyle.Primary)
+        );
+
+        const ticketRow2 = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('ticket_recruitment').setLabel('Recruitment 📄').setStyle(ButtonStyle.Danger),
+            new ButtonBuilder().setCustomId('ticket_partner').setLabel('Partnership 🤝').setStyle(ButtonStyle.Secondary)
+        );
+
+        await interaction.channel.send({ embeds: [verifyEmbed], components: [verifyRow] });
+        await interaction.channel.send({ embeds: [ticketEmbed], components: [ticketRow1, ticketRow2] });
+        await interaction.reply({ content: 'Wysłano panele!', ephemeral: true });
+    }
+});
+
+client.login(process.env.DISCORD_TOKEN);
