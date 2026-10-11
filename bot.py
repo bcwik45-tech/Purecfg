@@ -46,7 +46,6 @@ CATEGORY_SUPPORT_ID = 1556300180624769105
 CATEGORY_RECRUITMENT_ID = 1556300236526329936
 CATEGORY_PARTNER_ID = 1556383124424892606
 
-# Słownik do śledzenia cooldownu minigry (user_id -> data)
 minigame_cooldowns = {}
 
 
@@ -145,7 +144,6 @@ class TicketSystemView(discord.ui.View):
         await self.create_ticket_channel(interaction, "Partnership", ROLES_PARTNER, CATEGORY_PARTNER_ID, "🤝")
 
 
-# Zadanie w tle wysyłające przypomnienie co 2 godziny wraz z pingiem roli
 @tasks.loop(hours=2)
 async def minigame_reminder():
     channel = bot.get_channel(MINIGAME_CHANNEL_ID)
@@ -214,9 +212,11 @@ async def minigame(interaction: discord.Interaction):
         await interaction.response.send_message(f"❌ Tej komendy można używać wyłącznie na kanale <#{MINIGAME_CHANNEL_ID}>!", ephemeral=True)
         return
 
+    await interaction.response.defer()
+
     today = date.today()
     if minigame_cooldowns.get(interaction.user.id) == today:
-        await interaction.response.send_message("❌ Wykorzystałeś już swoją dzisiejszą próbę w minigrze! Spróbuj ponownie jutro (cooldown odnawia się o północy).", ephemeral=True)
+        await interaction.followup.send("❌ Wykorzystałeś już swoją dzisiejszą próbę w minigrze! Spróbuj ponownie jutro (cooldown odnawia się o północy).", ephemeral=True)
         return
 
     minigame_cooldowns[interaction.user.id] = today
@@ -246,7 +246,7 @@ async def minigame(interaction: discord.Interaction):
     embed.set_thumbnail(url=interaction.user.display_avatar.url)
     embed.set_image(url=MINIGAME_BANNER)
     
-    await interaction.response.send_message(embed=embed)
+    await interaction.followup.send(embed=embed)
 
 
 @bot.tree.command(name="say", description="Wyślij wiadomość w czytelnej ramce (Embed).")
