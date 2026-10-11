@@ -13,7 +13,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 # --- KONFIGURACJA ID ---
 WELCOME_CHANNEL_ID = 1556280506516115466  # Kanał powitań
-BANNER_URL = "https://i.imgur.com/YOUR_BANNER_HERE.png"  # Link do bannera
+BANNER_URL = "https://i.imgur.com/8K5Q62x.png"  # Link do bannera Cold Cfg
 
 # Kategorie ticketów
 TICKET_CATEGORIES = {
@@ -26,7 +26,7 @@ TICKET_CATEGORIES = {
 
 # Role mające dostęp do poszczególnych ticketów
 TICKET_ROLES = {
-    "shop": [140359821323149392], # (dopasuj ID ról)
+    "shop": [1540359821323149392],
     "owner": [1540359821323149392, 1540495893399081061],
     "support": [1540359821323149392, 1540495893399081061, 1556062543963750400, 1540359905175801946, 1540360086617063584],
     "recruitment": [1540359821323149392, 1540495893399081061, 1556062543963750400, 1540359905175801946],
@@ -117,7 +117,7 @@ async def on_ready():
     bot.add_view(TicketView())
     try:
         synced = await bot.tree.sync()
-        print(f"Zsynchronizowano komendy slash: {len(synced)}")
+        print(f"Zsynchronizowano {len(synced)} komend slash.")
     except Exception as e:
         print(e)
 
@@ -191,10 +191,7 @@ async def say(interaction: discord.Interaction, message: str):
 @discord.app_commands.checks.has_permissions(ban_members=True)
 async def bandc(interaction: discord.Interaction, target: discord.User, reason: str):
     await interaction.guild.ban(target, reason=reason)
-    embed = discord.Embed(
-        title="🔨 User has been banned for life",
-        color=0xff0000
-    )
+    embed = discord.Embed(title="🔨 User has been banned for life", color=0xff0000)
     embed.add_field(name="👤 User", value=f"<@!{target.id}>", inline=True)
     embed.add_field(name="🆔 ID", value=f"`{target.id}`", inline=True)
     embed.add_field(name="🛡️ Administrator", value=f"<@!{interaction.user.id}>", inline=False)
@@ -208,10 +205,7 @@ async def bandc(interaction: discord.Interaction, target: discord.User, reason: 
 async def unbandc(interaction: discord.Interaction, userid: str, reason: str = "Brak powody"):
     user = await bot.fetch_user(int(userid))
     await interaction.guild.unban(user, reason=reason)
-    embed = discord.Embed(
-        title="🔓 User has been unbanned",
-        color=0x00ff00
-    )
+    embed = discord.Embed(title="🔓 User has been unbanned", color=0x00ff00)
     embed.add_field(name="👤 User", value=f"<@!{userid}>", inline=True)
     embed.add_field(name="🆔 ID", value=f"`{userid}`", inline=True)
     embed.add_field(name="🛡️ Administrator", value=f"<@!{interaction.user.id}>", inline=False)
@@ -237,23 +231,19 @@ async def minigame(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed)
 
 
-@bot.tree.command(name="accept", description="Nadaje role zweryfikowanemu użytkownikowi")
+@bot.tree.command(name="accept", description="Accept candidate and give roles")
 @discord.app_commands.checks.has_permissions(manage_roles=True)
 async def accept(interaction: discord.Interaction, target: discord.Member):
-    roles_added = []
     for r_id in ACCEPT_ROLES:
         role = interaction.guild.get_role(r_id)
         if role:
             await target.add_roles(role)
-            roles_added.append(role.name)
-    
     await interaction.response.send_message(f"Pomyślnie nadano role użytkownikowi <@!{target.id}>!", ephemeral=True)
 
 
 @bot.tree.command(name="setup", description="Wysyła panele weryfikacji i ticketów")
 @discord.app_commands.checks.has_permissions(administrator=True)
 async def setup(interaction: discord.Interaction):
-    # Weryfikacja
     verify_embed = discord.Embed(
         title="Verification",
         description="Click on verification to get access to the channels",
@@ -261,7 +251,6 @@ async def setup(interaction: discord.Interaction):
     )
     await interaction.channel.send(embed=verify_embed, view=VerifyView())
 
-    # Tickety
     ticket_embed = discord.Embed(
         title="🎫 Tickets",
         description=(
@@ -275,5 +264,4 @@ async def setup(interaction: discord.Interaction):
     await interaction.response.send_message("Wysłano panele!", ephemeral=True)
 
 
-# Uruchomienie bota przy użyciu zmiennej środowiskowej TOKEN
 bot.run(os.getenv("DISCORD_TOKEN"))
