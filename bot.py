@@ -27,7 +27,10 @@ ROLE_SUPPORT_ID = 1556300180624769105
 ROLE_RECRUITMENT_ID = 1556300236526329936
 ROLE_PARTNER_ID = 1556383124424892606
 
+# ==========================================
 # ID KATEGORII NA DISCORDZIE DLA TICKETÓW
+# (Podmień poniższe ID na ID odpowiednich kategorii z Twojego serwera)
+# ==========================================
 CATEGORY_OWNER_ID = 123456789012345678
 CATEGORY_SHOP_ID = 123456789012345678
 CATEGORY_SUPPORT_ID = 123456789012345678
@@ -83,6 +86,7 @@ class TicketSystemView(discord.ui.View):
 
         channel_name = f"{emoji}-{ticket_type.lower()}-{user.name}"
         
+        # Tworzenie kanału w wyznaczonej kategorii
         channel = await guild.create_text_channel(
             name=channel_name, 
             overwrites=overwrites, 
