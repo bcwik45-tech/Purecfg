@@ -27,10 +27,7 @@ ROLE_SUPPORT_ID = 1556300180624769105
 ROLE_RECRUITMENT_ID = 1556300236526329936
 ROLE_PARTNER_ID = 1556383124424892606
 
-# ==========================================
 # ID KATEGORII NA DISCORDZIE DLA TICKETÓW
-# (Podmień poniższe ID na ID odpowiednich kategorii z Twojego serwera)
-# ==========================================
 CATEGORY_OWNER_ID = 123456789012345678
 CATEGORY_SHOP_ID = 123456789012345678
 CATEGORY_SUPPORT_ID = 123456789012345678
@@ -93,8 +90,6 @@ class TicketSystemView(discord.ui.View):
         )
 
         role_mention = role.mention if role else "@here"
-        
-        # Żółty dla Partnership, niebieski dla pozostałych
         embed_color = 0xf1c40f if ticket_type == "Partnership" else 0x3498db
 
         embed = discord.Embed(
@@ -187,4 +182,67 @@ async def minigame(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed)
 
 
-@bot.tree.command(name="say", description="
+@bot.tree.command(name="say", description="Wyślij wiadomość w czytelnej ramce (Embed).")
+@app_commands.describe(wiadomosc="Treść wiadomości do wysłania")
+async def say(interaction: discord.Interaction, wiadomosc: str):
+    embed = discord.Embed(description=wiadomosc, color=0x2b2d31)
+    embed.set_footer(text=f"Coldcfg • Today, Ad made by {interaction.user.display_name}")
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.tree.command(name="bandc", description="Banuje użytkownika i tworzy raport o banie.")
+@app_commands.describe(user="Użytkownik do zabanowania", reason="Powód bana")
+@app_commands.checks.has_permissions(ban_members=True)
+async def bandc(interaction: discord.Interaction, user: discord.Member, reason: str = "mrbeast"):
+    embed = discord.Embed(title="🔨 User has been banned for life", color=discord.Color.red())
+    embed.add_field(name="👤 User", value=user.mention, inline=True)
+    embed.add_field(name="🆔 ID", value=f"`{user.id}`", inline=True)
+    embed.add_field(name="🛡️ Administrator", value=interaction.user.mention, inline=False)
+    embed.add_field(name="📝 Reason", value=f"```\n{reason}\n```", inline=False)
+    embed.set_image(url=COLDCFG_BANNER)
+    embed.set_footer(text="COLDCFG Security")
+
+    try:
+        await user.ban(reason=f"{reason} (Wystawił: {interaction.user})")
+        await interaction.response.send_message(embed=embed)
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Nie udało się zabanować: {e}", ephemeral=True)
+
+
+@bot.event
+async def on_member_join(member: discord.Member):
+    channel = member.guild.get_channel(WELCOME_CHANNEL_ID)
+    if channel:
+        created_at = member.created_at.strftime("%d.%m.%Y %H:%M:%S")
+        joined_at = member.joined_at.strftime("%d %B %Y %H:%M") if member.joined_at else "Now"
+
+        embed = discord.Embed(
+            title="New member!",
+            description=f"🎉 Hi\n{member.mention}\nWelcome to the best cfg in Poland!\nGo check out our stuff!\n\n**You're our {member.guild.member_count} member!**\n\n**Member Info:**\n🪪 **Discord account created:**\n{created_at}\n👤 **Username:** `{member.name}`\n📅 **Joined at:** {joined_at}",
+            color=0x2b2d31
+        )
+        embed.set_thumbnail(url=THUMBNAIL_URL)
+        await channel.send(embed=embed)
+
+
+@bot.event
+async def on_member_update(before: discord.Member, after: discord.Member):
+    if before.premium_since is None and after.premium_since is not None:
+        channel = after.guild.get_channel(BOOST_CHANNEL_ID)
+        if channel:
+            guild = after.guild
+            embed = discord.Embed(
+                title="⚙️ New server Boost!",
+                description=f"{after.mention} **BOOST!**\n> thanks for boosting our server!\n> Go check out our booster zone!\n\n**Boost Info:**\n🧊 **Server Boost level:** `{guild.premium_tier}`\n🔢 **Boost count:** `{guild.premium_subscription_count}`",
+                color=0xff73fa
+            )
+            embed.set_thumbnail(url=THUMBNAIL_URL)
+            embed.set_image(url=COLDCFG_BOOST_BANNER)
+            await channel.send(embed=embed)
+
+
+TOKEN = os.getenv("DISCORD_TOKEN")
+if TOKEN:
+    bot.run(TOKEN)
+else:
+    print("❌ BŁĄD: Brak zmiennej DISCORD_TOKEN w Variables na Railway!")
