@@ -64,4 +64,126 @@ class CloseTicketView(discord.ui.View):
     async def close_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message("🔒 Ten ticket zostanie zamknięty za 5 sekund...")
         await asyncio.sleep(5)
-        await interaction.channel
+        await interaction.channel.delete()
+
+
+class TicketSystemView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    async def create_ticket_channel(self, interaction: discord.Interaction, ticket_type: str, role_id: int):
+        guild = interaction.guild
+        user = interaction.user
+        role = guild.get_role(role_id)
+
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(read_messages=False),
+            user: discord.PermissionOverwrite(read_messages=True, send_messages=True),
+            guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True)
+        }
+        if role:
+            overwrites[role] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
+
+        channel_name = f"ticket-{ticket_type.lower()}-{user.name}"
+        channel = await guild.create_text_channel(name=channel_name, overwrites=overwrites)
+
+        role_mention = role.mention if role else "Administration"
+        embed = discord.Embed(
+            title=f"🎫 Ticket - {ticket_type}",
+            description=f"Witaj {user.mention}!\nOpisz swój problem lub zapytanie. Administracja ({role_mention}) niedługo Ci odpowie.",
+            color=0x2b2d31
+        )
+        await channel.send(content=f"{user.mention} | {role_mention}", embed=embed, view=CloseTicketView())
+        await interaction.response.send_message(f"✅ Twój ticket został utworzony: {channel.mention}", ephemeral=True)
+
+    @discord.ui.button(label="Shop 🛒", style=discord.ButtonStyle.success, custom_id="btn_shop")
+    async def shop_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.create_ticket_channel(interaction, "Shop", ROLE_SHOP_ID)
+
+    @discord.ui.button(label="Owner 👑", style=discord.ButtonStyle.secondary, custom_id="btn_owner")
+    async def owner_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.create_ticket_channel(interaction, "Owner", ROLE_OWNER_ID)
+
+    @discord.ui.button(label="Support ❓", style=discord.ButtonStyle.primary, custom_id="btn_support")
+    async def support_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.create_ticket_channel(interaction, "Support", ROLE_SUPPORT_ID)
+
+    @discord.ui.button(label="Recruitment 📄", style=discord.ButtonStyle.danger, custom_id="btn_recruitment")
+    async def recruitment_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.create_ticket_channel(interaction, "Recruitment", ROLE_RECRUITMENT_ID)
+
+    @discord.ui.button(label="Partnership 🤝", style=discord.ButtonStyle.secondary, custom_id="btn_partnership")
+    async def partnership_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.create_ticket_channel(interaction, "Partnership", ROLE_PARTNER_ID)
+
+
+# ==========================================
+# ON_READY
+# ==========================================
+@bot.event
+async def on_ready():
+    print(f"✅ Coldcfg Bot zalogowany jako {bot.user.name}")
+    
+    bot.add_view(VerifyView())
+    bot.add_view(TicketSystemView())
+    bot.add_view(CloseTicketView())
+
+    try:
+        synced = await bot.tree.sync()
+        print(f"⚡ Zsynchronizowano {len(synced)} komend slash.")
+    except Exception as e:
+        print(f"❌ Błąd synchronizacji komend: {e}")
+
+
+# ==========================================
+# KOMENDY SETUP
+# ==========================================
+
+@bot.tree.command(name="setup_weryfikacja", description="Tworzy panel weryfikacji na kanale.")
+@app_commands.checks.has_permissions(administrator=True)
+async def setup_weryfikacja(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="Verification",
+        description="Click on verification to get access to the channels",
+        color=discord.Color.green()
+    )
+    await interaction.channel.send(embed=embed, view=VerifyView())
+    await interaction.response.send_message("✅ Panel weryfikacji został wysłany!", ephemeral=True)
+
+
+@bot.tree.command(name="setup_ticket", description="Tworzy panel wszystkich ticketów na kanale.")
+@app_commands.checks.has_permissions(administrator=True)
+async def setup_ticket(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="🎟️ Tickets",
+        description=(
+            "Want to place an order, need to contact the owner or staff for help?\n"
+            "Click the appropriate button below to open a private channel with the administration.\n\n"
+            "Please don't open the tickets without a proper reason."
+        ),
+        color=0xf1c40f
+    )
+    await interaction.channel.send(embed=embed, view=TicketSystemView())
+    await interaction.response.send_message("✅ Panel ticketów został wysłany!", ephemeral=True)
+
+
+# ==========================================
+# KOMENDY UŻYTKOWE
+# ==========================================
+
+@bot.tree.command(name="minigame", description="Zagraj w minigrę i sprawdź swoje szczęście!")
+async def minigame(interaction: discord.Interaction):
+    win = random.randint(1, 35) == 1
+
+    if win:
+        embed = discord.Embed(
+            title="🐱 Congratulations!",
+            description=f"{interaction.user.mention}, **YOU WON!** 🎉\nYou hit the 1 in 35 chance!",
+            color=discord.Color.green()
+        )
+    else:
+        embed = discord.Embed(
+            title="🐱 We're sorry!",
+            description=(
+                f"{interaction.user.mention}, **this time you didn't win anything.** "
+                f"Try your luck again tomorrow!\n\n"
