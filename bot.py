@@ -20,7 +20,9 @@ BOOST_CHANNEL_ID = 123456789012345678
 
 ROLE_VERIFIED_ID = 1540360249775493230
 
-# ID RÓL DLA TICKETÓW
+# ==========================================
+# LISTY RÓL DLA POSZCZEGÓLNYCH TICKETÓW
+# ==========================================
 ROLES_OWNER = [1540359821323149392, 1540495893399081061]
 ROLES_SHOP = [1540359821323149392]
 ROLES_SUPPORT = [1540360086617063584, 1540359905175801946, 1556062543963750400, 1540495893399081061, 1540359821323149392]
@@ -29,7 +31,6 @@ ROLES_PARTNER = [1540359821323149392, 1540495893399081061]
 
 # ==========================================
 # ID KATEGORII NA DISCORDZIE DLA TICKETÓW
-# (Podmień poniższe ID na prawdziwe ID kategorii z Twojego serwera)
 # ==========================================
 CATEGORY_OWNER_ID = 1556300080355606608
 CATEGORY_SHOP_ID = 1556300130892906506
@@ -44,15 +45,16 @@ class VerifyView(discord.ui.View):
 
     @discord.ui.button(label="Zweryfikuj", style=discord.ButtonStyle.success, custom_id="verify_button")
     async def verify_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True)
         role = interaction.guild.get_role(ROLE_VERIFIED_ID)
         if role:
             if role in interaction.user.roles:
-                await interaction.response.send_message("❌ Jesteś już zweryfikowany!", ephemeral=True)
+                await interaction.followup.send("❌ Jesteś już zweryfikowany!", ephemeral=True)
             else:
                 await interaction.user.add_roles(role)
-                await interaction.response.send_message("✅ Pomyślnie zweryfikowano! Otrzymałeś dostęp do kanałów.", ephemeral=True)
+                await interaction.followup.send("✅ Pomyślnie zweryfikowano! Otrzymałeś dostęp do kanałów.", ephemeral=True)
         else:
-            await interaction.response.send_message("❌ Błąd: Nie znaleziono roli do weryfikacji.", ephemeral=True)
+            await interaction.followup.send("❌ Błąd: Nie znaleziono roli do weryfikacji.", ephemeral=True)
 
 
 class CloseTicketView(discord.ui.View):
@@ -70,10 +72,12 @@ class TicketSystemView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    async def create_ticket_channel(self, interaction: discord.Interaction, ticket_type: str, role_id: int, category_id: int, emoji: str):
+    async def create_ticket_channel(self, interaction: discord.Interaction, ticket_type: str, role_ids: list, category_id: int, emoji: str):
+        # Odroczenie odpowiedzi, by zapobiec wygaśnięciu interakcji (3s limit Discorda)
+        await interaction.response.defer(ephemeral=True)
+
         guild = interaction.guild
         user = interaction.user
-        role = guild.get_role(role_id)
         category = guild.get_channel(category_id)
 
         overwrites = {
@@ -81,12 +85,16 @@ class TicketSystemView(discord.ui.View):
             user: discord.PermissionOverwrite(read_messages=True, send_messages=True),
             guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True)
         }
-        if role:
-            overwrites[role] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
+        
+        roles_mentions = []
+        for r_id in role_ids:
+            role = guild.get_role(r_id)
+            if role:
+                overwrites[role] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
+                roles_mentions.append(role.mention)
 
         channel_name = f"{emoji}-{ticket_type.lower()}-{user.name}"
         
-        # Przypisanie do kategorii
         target_category = category if isinstance(category, discord.CategoryChannel) else None
 
         channel = await guild.create_text_channel(
@@ -95,7 +103,7 @@ class TicketSystemView(discord.ui.View):
             category=target_category
         )
 
-        role_mention = role.mention if role else "@here"
+        role_ping_str = " ".join(roles_mentions) if roles_mentions else "@here"
         embed_color = 0xf1c40f if ticket_type == "Partnership" else 0x3498db
 
         embed = discord.Embed(
@@ -104,28 +112,28 @@ class TicketSystemView(discord.ui.View):
             color=embed_color
         )
         
-        await channel.send(content=f"{user.mention} {role_mention}", embed=embed, view=CloseTicketView())
-        await interaction.response.send_message(f"✅ Twój ticket został utworzony: {channel.mention}", ephemeral=True)
+        await channel.send(content=f"{user.mention} {role_ping_str}", embed=embed, view=CloseTicketView())
+        await interaction.followup.send(f"✅ Twój ticket został utworzony: {channel.mention}", ephemeral=True)
 
     @discord.ui.button(label="Shop 🛒", style=discord.ButtonStyle.success, custom_id="btn_shop")
     async def shop_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.create_ticket_channel(interaction, "Shop", ROLE_SHOP_ID, CATEGORY_SHOP_ID, "🛒")
+        await self.create_ticket_channel(interaction, "Shop", ROLES_SHOP, CATEGORY_SHOP_ID, "🛒")
 
     @discord.ui.button(label="Owner 👑", style=discord.ButtonStyle.secondary, custom_id="btn_owner")
     async def owner_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.create_ticket_channel(interaction, "Owner", ROLE_OWNER_ID, CATEGORY_OWNER_ID, "👑")
+        await self.create_ticket_channel(interaction, "Owner", ROLES_OWNER, CATEGORY_OWNER_ID, "👑")
 
     @discord.ui.button(label="Support ❓", style=discord.ButtonStyle.primary, custom_id="btn_support")
     async def support_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.create_ticket_channel(interaction, "Support", ROLE_SUPPORT_ID, CATEGORY_SUPPORT_ID, "❓")
+        await self.create_ticket_channel(interaction, "Support", ROLES_SUPPORT, CATEGORY_SUPPORT_ID, "❓")
 
     @discord.ui.button(label="Recruitment 📄", style=discord.ButtonStyle.danger, custom_id="btn_recruitment")
     async def recruitment_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.create_ticket_channel(interaction, "Recruitment", ROLE_RECRUITMENT_ID, CATEGORY_RECRUITMENT_ID, "📄")
+        await self.create_ticket_channel(interaction, "Recruitment", ROLES_RECRUITMENT, CATEGORY_RECRUITMENT_ID, "📄")
 
     @discord.ui.button(label="Partnership 🤝", style=discord.ButtonStyle.secondary, custom_id="btn_partnership")
     async def partnership_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.create_ticket_channel(interaction, "Partnership", ROLE_PARTNER_ID, CATEGORY_PARTNER_ID, "🤝")
+        await self.create_ticket_channel(interaction, "Partnership", ROLES_PARTNER, CATEGORY_PARTNER_ID, "🤝")
 
 
 @bot.event
@@ -239,16 +247,4 @@ async def on_member_update(before: discord.Member, after: discord.Member):
             guild = after.guild
             embed = discord.Embed(
                 title="⚙️ New server Boost!",
-                description=f"{after.mention} **BOOST!**\n> thanks for boosting our server!\n> Go check out our booster zone!\n\n**Boost Info:**\n🧊 **Server Boost level:** `{guild.premium_tier}`\n🔢 **Boost count:** `{guild.premium_subscription_count}`",
-                color=0xff73fa
-            )
-            embed.set_thumbnail(url=THUMBNAIL_URL)
-            embed.set_image(url=COLDCFG_BOOST_BANNER)
-            await channel.send(embed=embed)
-
-
-TOKEN = os.getenv("DISCORD_TOKEN")
-if TOKEN:
-    bot.run(TOKEN)
-else:
-    print("❌ BŁĄD: Brak zmiennej DISCORD_TOKEN w Variables na Railway!")
+                description=f"{after.mention} **BOOST!**\n> thanks for boosting our server!\n> Go check out our booster zone!\n\n
