@@ -1,9 +1,10 @@
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 from discord import app_commands
 import random
 import asyncio
 import os
+from datetime import date
 
 intents = discord.Intents.default()
 intents.members = True
@@ -17,6 +18,8 @@ THUMBNAIL_URL = "https://i.imgur.com/your_thumbnail.png"
 
 WELCOME_CHANNEL_ID = 123456789012345678
 BOOST_CHANNEL_ID = 123456789012345678
+MINIGAME_CHANNEL_ID = 1556566161653764157
+MINIGAME_WIN_ROLE_ID = 1556565240832073779
 
 ROLE_VERIFIED_ID = 1540360249775493230
 
@@ -37,6 +40,9 @@ CATEGORY_SHOP_ID = 1556300130892906506
 CATEGORY_SUPPORT_ID = 1556300180624769105
 CATEGORY_RECRUITMENT_ID = 1556300236526329936
 CATEGORY_PARTNER_ID = 1556383124424892606
+
+# Słownik do śledzenia cooldownu minigry (user_id -> data)
+minigame_cooldowns = {}
 
 
 class VerifyView(discord.ui.View):
@@ -134,12 +140,33 @@ class TicketSystemView(discord.ui.View):
         await self.create_ticket_channel(interaction, "Partnership", ROLES_PARTNER, CATEGORY_PARTNER_ID, "🤝")
 
 
+# Zadanie w tle wysyłające przypomnienie co 2 godziny
+@tasks.loop(hours=2)
+async def minigame_reminder():
+    channel = bot.get_channel(MINIGAME_CHANNEL_ID)
+    if channel:
+        embed = discord.Embed(
+            title="🎮 Daily Minigame Reminder!",
+            description="Hey everyone! Don't forget to test your luck today with `/minigame`! Win amazing rewards and a special role!",
+            color=0x3498db
+        )
+        embed.set_image(url=COLDCFG_BANNER)
+        await channel.send(embed=embed)
+
+@minigame_reminder.before_loop
+async def before_minigame_reminder():
+    await bot.wait_until_ready()
+
+
 @bot.event
 async def on_ready():
     print(f"✅ Coldcfg Bot zalogowany jako {bot.user.name}")
     bot.add_view(VerifyView())
     bot.add_view(TicketSystemView())
     bot.add_view(CloseTicketView())
+    
+    if not minigame_reminder.is_running():
+        minigame_reminder.start()
 
     try:
         synced = await bot.tree.sync()
@@ -174,12 +201,33 @@ async def setup_ticket(interaction: discord.Interaction):
 
 @bot.tree.command(name="minigame", description="Zagraj w minigrę i sprawdź swoje szczęście!")
 async def minigame(interaction: discord.Interaction):
+    # Sprawdzenie czy komenda jest wywoływana na właściwym kanale
+    if interaction.channel.id != MINIGAME_CHANNEL_ID:
+        await interaction.response.send_message(f"❌ Tej komendy można używać wyłącznie na kanale <#{MINIGAME_CHANNEL_ID}>!", ephemeral=True)
+        return
+
+    # Sprawdzenie cooldownu raz dziennie (odnawia się o północy)
+    today = date.today()
+    if minigame_cooldowns.get(interaction.user.id) == today:
+        await interaction.response.send_message("❌ Wykorzystałeś już swoją dzisiejszą próbę w minigrze! Spróbuj ponownie jutro (cooldown odnawia się o północy).", ephemeral=True)
+        return
+
+    # Ustawienie dzisiejszej daty jako wykorzystanej dla użytkownika
+    minigame_cooldowns[interaction.user.id] = today
+
     win = random.randint(1, 35) == 1
 
     if win:
+        role = interaction.guild.get_role(MINIGAME_WIN_ROLE_ID)
+        if role:
+            try:
+                await interaction.user.add_roles(role)
+            except Exception:
+                pass
+
         embed = discord.Embed(
             title="🐱 Congratulations!",
-            description=f"{interaction.user.mention}, **YOU WON!** 🎉\nYou hit the 1 in 35 chance!",
+            description=f"{interaction.user.mention}, **YOU WON!** 🎉\nYou hit the 1 in 35 chance and received a special role!",
             color=discord.Color.green()
         )
     else:
@@ -189,7 +237,7 @@ async def minigame(interaction: discord.Interaction):
             color=0x2b2d31
         )
 
-    embed.set_thumbnail(url=THUMBNAIL_URL)
+    embed.set_thumbnail(url=interaction.user.display_avatar.url)
     embed.set_image(url=COLDCFG_BANNER)
     await interaction.response.send_message(embed=embed)
 
