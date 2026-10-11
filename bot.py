@@ -174,4 +174,111 @@ async def on_member_join(member: discord.Member):
     avatar_url = member.guild.icon.url if member.guild.icon else member.display_avatar.url
     embed.set_thumbnail(url=avatar_url)
 
-    await channel.
+    await channel.send(embed=embed)
+
+
+# --- BOOSTY ---
+@bot.event
+async def on_member_update(before: discord.Member, after: discord.Member):
+    if before.premium_since is None and after.premium_since is not None:
+        channel = after.guild.system_channel
+        if not channel:
+            return
+
+        embed = discord.Embed(
+            title="💎 New server Boost!",
+            description=(
+                f"<@!{after.id}> **BOOST!**\n"
+                f"> thanks for boosting our server!\n"
+                f"> Go check out our booster zone!\n\n"
+                f"**Boost Info:**\n"
+                f"🧊 Server Boost level: `{after.guild.premium_tier}`\n"
+                f"🔢 Boost count: `{after.guild.premium_subscription_count}`"
+            ),
+            color=0xff73fa
+        )
+        embed.set_thumbnail(url=after.display_avatar.url)
+        embed.set_image(url=BANNER_URL)
+
+        await channel.send(embed=embed)
+
+
+# --- KOMENDY SLASH ---
+
+@bot.tree.command(name="say", description="Wysyła wiadomość jako embed")
+async def say(interaction: discord.Interaction, message: str):
+    embed = discord.Embed(description=message, color=0x2b2d31)
+    embed.set_footer(text=f"{bot.user.name} • Today, Ad made by {interaction.user.name}")
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.tree.command(name="bandc", description="Banuje użytkownika")
+@discord.app_commands.checks.has_permissions(ban_members=True)
+async def bandc(interaction: discord.Interaction, target: discord.User, reason: str):
+    await interaction.guild.ban(target, reason=reason)
+    embed = discord.Embed(title="🔨 User has been banned for life", color=0xff0000)
+    embed.add_field(name="👤 User", value=f"<@!{target.id}>", inline=True)
+    embed.add_field(name="🆔 ID", value=f"`{target.id}`", inline=True)
+    embed.add_field(name="🛡️ Administrator", value=f"<@!{interaction.user.id}>", inline=False)
+    embed.add_field(name="📝 Reason", value=f"```\n{reason}\n```", inline=False)
+    embed.set_image(url=BANNER_URL)
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.tree.command(name="unbandc", description="Odbanowuje użytkownika")
+@discord.app_commands.checks.has_permissions(ban_members=True)
+async def unbandc(interaction: discord.Interaction, userid: str, reason: str = "Brak powodu"):
+    user = await bot.fetch_user(int(userid))
+    await interaction.guild.unban(user, reason=reason)
+    embed = discord.Embed(title="🔓 User has been unbanned", color=0x00ff00)
+    embed.add_field(name="👤 User", value=f"<@!{userid}>", inline=True)
+    embed.add_field(name="🆔 ID", value=f"`{userid}`", inline=True)
+    embed.add_field(name="🛡️ Administrator", value=f"<@!{interaction.user.id}>", inline=False)
+    embed.add_field(name="📝 Reason", value=f"```\n{reason}\n```", inline=False)
+    embed.set_image(url=BANNER_URL)
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.tree.command(name="minigame", description="Losowanie nagrody w Cold Cfg")
+async def minigame(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="🐱 We're sorry!",
+        description=(
+            f"<@!{interaction.user.id}>, this time you didn't win anything. Try your luck again tomorrow!\n\n"
+            f"**Some Info:**\n"
+            f"*Your chance was* **1** *in* **35**.\n\n"
+            f"*We wish you better luck next time!*"
+        ),
+        color=0x2b2d31
+    )
+    embed.set_thumbnail(url=interaction.user.display_avatar.url)
+    embed.set_image(url=BANNER_URL)
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.tree.command(name="accept", description="Accept candidate and give roles")
+@discord.app_commands.checks.has_permissions(manage_roles=True)
+async def accept(interaction: discord.Interaction, target: discord.Member):
+    for r_id in ACCEPT_ROLES:
+        role = interaction.guild.get_role(r_id)
+        if role:
+            await target.add_roles(role)
+    await interaction.response.send_message(f"Pomyślnie nadano role użytkownikowi <@!{target.id}>!", ephemeral=True)
+
+
+@bot.tree.command(name="setup_weryfikacja", description="Wysyła panel weryfikacji")
+@discord.app_commands.checks.has_permissions(administrator=True)
+async def setup_weryfikacja(interaction: discord.Interaction):
+    verify_embed = discord.Embed(
+        title="Verification",
+        description="Click on verification to get access to the channels",
+        color=0x2ecc71
+    )
+    await interaction.channel.send(embed=verify_embed, view=VerifyView())
+    await interaction.response.send_message("Wysłano panel weryfikacji!", ephemeral=True)
+
+
+@bot.tree.command(name="setup_tickets", description="Wysyła panel ticketów")
+@discord.app_commands.checks.has_permissions(administrator=True)
+async def setup_tickets(interaction: discord.Interaction):
+    ticket_embed = discord.Embed
