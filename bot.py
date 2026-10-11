@@ -239,9 +239,9 @@ async def minigame(interaction: discord.Interaction):
             color=0x2b2d31
         )
 
-    # Miniaturka (mały obrazek w prawym górnym rogu) to awatar użytkownika
+    # Awatar użytkownika jako miniaturka w prawym górnym rogu
     embed.set_thumbnail(url=interaction.user.display_avatar.url)
-    # Baner (duży obrazek na dole) to grafika z napisem ColdCfg
+    # Obrazek z kwitnącą wiśnią i napisem ColdCfg jako duży baner na dole
     embed.set_image(url=MINIGAME_BANNER)
     
     await interaction.response.send_message(embed=embed)
