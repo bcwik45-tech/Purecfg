@@ -24,6 +24,15 @@ TICKET_CATEGORIES = {
     "partner": 1556383124424892606
 }
 
+# Emotki dla poszczególnych kategorii do nazwy kanału
+TICKET_EMOJIS = {
+    "shop": "🛒",
+    "owner": "👑",
+    "support": "❓",
+    "recruitment": "📄",
+    "partner": "🤝"
+}
+
 # Role mające dostęp do poszczególnych ticketów
 TICKET_ROLES = {
     "shop": [1540359821323149392],
@@ -37,6 +46,20 @@ TICKET_ROLES = {
 ACCEPT_ROLES = [1540359963346608168, 1540360086617063584]
 
 
+class CloseTicketView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Zamknij ticket 🔒", style=discord.ButtonStyle.danger, custom_id="close_ticket_btn")
+    async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("Zamykanie ticketu za 3 sekundy...", ephemeral=True)
+        await discord.utils.sleep_until(discord.utils.utcnow() + discord.timedelta(seconds=3))
+        try:
+            await interaction.channel.delete()
+        except Exception:
+            pass
+
+
 class TicketView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -46,6 +69,7 @@ class TicketView(discord.ui.View):
         category_id = TICKET_CATEGORIES.get(ticket_type)
         category = guild.get_channel(category_id) if category_id else None
         allowed_role_ids = TICKET_ROLES.get(ticket_type, [])
+        emoji = TICKET_EMOJIS.get(ticket_type, "🎫")
 
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(view_channel=False),
@@ -58,17 +82,17 @@ class TicketView(discord.ui.View):
             if role:
                 overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True)
 
-        channel_name = f"ticket-{ticket_type}-{interaction.user.name}".lower()
+        channel_name = f"{emoji}-ticket-{ticket_type}-{interaction.user.name}".lower()
         ticket_channel = await guild.create_text_channel(channel_name, category=category, overwrites=overwrites)
 
         role_pings = " ".join([f"<@&{r_id}>" for r_id in allowed_role_ids])
 
         embed = discord.Embed(
             title=f"Ticket: {ticket_type.upper()}",
-            description=f"Witaj <@!{interaction.user.id}>!\nAdministracja wkrótce odpowie na Twoje zgłoszenie.",
+            description=f"Witaj <@!{interaction.user.id}>!\nAdministracja wkrótce odpowie na Twoje zgłoszenie.\n\nAby zamknąć ten kanał, kliknij przycisk poniżej.",
             color=0x2b2d31
         )
-        await ticket_channel.send(content=f"{role_pings} <@!{interaction.user.id}>", embeds=[embed])
+        await ticket_channel.send(content=f"{role_pings} <@!{interaction.user.id}>", embeds=[embed], view=CloseTicketView())
         await interaction.response.send_message(f"Utworzono Twój ticket: {ticket_channel.mention}", ephemeral=True)
 
     @discord.ui.button(label="Shop 🛒", style=discord.ButtonStyle.success, custom_id="ticket_shop")
@@ -115,6 +139,7 @@ async def on_ready():
     print(f"Zalogowano jako {bot.user.name}!")
     bot.add_view(VerifyView())
     bot.add_view(TicketView())
+    bot.add_view(CloseTicketView())
     try:
         synced = await bot.tree.sync()
         print(f"Zsynchronizowano {len(synced)} komend slash.")
@@ -193,7 +218,7 @@ async def bandc(interaction: discord.Interaction, target: discord.User, reason: 
     await interaction.guild.ban(target, reason=reason)
     embed = discord.Embed(title="🔨 User has been banned for life", color=0xff0000)
     embed.add_field(name="👤 User", value=f"<@!{target.id}>", inline=True)
-    embed.add_field(name="🆔 ID", value=f"`{target.id}`", inline=True)
+    embed.add_field(name="🆔 ID", value=`{target.id}`, inline=True)
     embed.add_field(name="🛡️ Administrator", value=f"<@!{interaction.user.id}>", inline=False)
     embed.add_field(name="📝 Reason", value=f"```\n{reason}\n```", inline=False)
     embed.set_image(url=BANNER_URL)
@@ -216,57 +241,4 @@ async def unbandc(interaction: discord.Interaction, userid: str, reason: str = "
 
 @bot.tree.command(name="minigame", description="Losowanie nagrody w Cold Cfg")
 async def minigame(interaction: discord.Interaction):
-    embed = discord.Embed(
-        title="🐱 We're sorry!",
-        description=(
-            f"<@!{interaction.user.id}>, this time you didn't win anything. Try your luck again tomorrow!\n\n"
-            f"**Some Info:**\n"
-            f"*Your chance was* **1** *in* **35**.\n\n"
-            f"*We wish you better luck next time!*"
-        ),
-        color=0x2b2d31
-    )
-    embed.set_thumbnail(url=interaction.user.display_avatar.url)
-    embed.set_image(url=BANNER_URL)
-    await interaction.response.send_message(embed=embed)
-
-
-@bot.tree.command(name="accept", description="Accept candidate and give roles")
-@discord.app_commands.checks.has_permissions(manage_roles=True)
-async def accept(interaction: discord.Interaction, target: discord.Member):
-    for r_id in ACCEPT_ROLES:
-        role = interaction.guild.get_role(r_id)
-        if role:
-            await target.add_roles(role)
-    await interaction.response.send_message(f"Pomyślnie nadano role użytkownikowi <@!{target.id}>!", ephemeral=True)
-
-
-@bot.tree.command(name="setup_weryfikacja", description="Wysyła panel weryfikacji")
-@discord.app_commands.checks.has_permissions(administrator=True)
-async def setup_weryfikacja(interaction: discord.Interaction):
-    verify_embed = discord.Embed(
-        title="Verification",
-        description="Click on verification to get access to the channels",
-        color=0x2ecc71
-    )
-    await interaction.channel.send(embed=verify_embed, view=VerifyView())
-    await interaction.response.send_message("Wysłano panel weryfikacji!", ephemeral=True)
-
-
-@bot.tree.command(name="setup_tickets", description="Wysyła panel ticketów")
-@discord.app_commands.checks.has_permissions(administrator=True)
-async def setup_tickets(interaction: discord.Interaction):
-    ticket_embed = discord.Embed(
-        title="🎫 Tickets",
-        description=(
-            "Want to place an order, need to contact the owner or staff for help?\n"
-            "Click the appropriate button below to open a private channel with the administration.\n\n"
-            "Please don't open the tickets without a proper reason."
-        ),
-        color=0x3498db
-    )
-    await interaction.channel.send(embed=ticket_embed, view=TicketView())
-    await interaction.response.send_message("Wysłano panel ticketów!", ephemeral=True)
-
-
-bot.run(os.getenv("DISCORD_TOKEN"))
+    embed = discord.Embed
