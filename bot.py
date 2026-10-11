@@ -3,7 +3,6 @@ from discord.ext import commands, tasks
 import os
 from datetime import datetime, time, timezone, timedelta
 
-# Konfiguracja intentów
 intents = discord.Intents.default()
 intents.guilds = True
 intents.members = True
@@ -12,15 +11,13 @@ intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# --- KONFIGURACJA ID ---
-WELCOME_CHANNEL_ID = 1556280506516115466  # Kanał powitań
-BANNER_URL = "https://i.imgur.com/8K5Q62x.png"  # Link do bannera Cold Cfg
-MINIGAME_IMAGE_URL = "https://i.imgur.com/rgprszrgprsz.png"  # Obraz minigry
+WELCOME_CHANNEL_ID = 1556280506516115466
+BANNER_URL = "https://i.imgur.com/8K5Q62x.png"
+MINIGAME_IMAGE_URL = "https://i.imgur.com/rgprszrgprsz.png"
 
 WINNER_ROLE_ID = 1556565240832073779
 REM_ROLE_ID = 1540360249775493230
 
-# Kategorie ticketów
 TICKET_CATEGORIES = {
     "shop": 1556300130892906506,
     "owner": 1556300080355606608,
@@ -136,7 +133,6 @@ class VerifyView(discord.ui.View):
             await interaction.response.send_message("Pomyślnie zweryfikowano!", ephemeral=True)
 
 
-# Pętla przypominająca co 2 godziny z pingiem roli
 @tasks.loop(hours=2)
 async def minigame_reminder():
     for guild in bot.guilds:
@@ -164,7 +160,6 @@ async def on_ready():
         print(e)
 
 
-# --- POWITANIA ---
 @bot.event
 async def on_member_join(member: discord.Member):
     channel = member.guild.get_channel(WELCOME_CHANNEL_ID)
@@ -194,7 +189,6 @@ async def on_member_join(member: discord.Member):
     await channel.send(embed=embed)
 
 
-# --- BOOSTY ---
 @bot.event
 async def on_member_update(before: discord.Member, after: discord.Member):
     if before.premium_since is None and after.premium_since is not None:
@@ -207,44 +201,4 @@ async def on_member_update(before: discord.Member, after: discord.Member):
             description=(
                 f"<@!{after.id}> **BOOST!**\n"
                 f"> thanks for boosting our server!\n"
-                f"> Go check out our booster zone!\n\n"
-                f"**Boost Info:**\n"
-                f"🧊 Server Boost level: `{after.guild.premium_tier}`\n"
-                f"🔢 Boost count: `{after.guild.premium_subscription_count}`"
-            ),
-            color=0xff73fa
-        )
-        embed.set_thumbnail(url=after.display_avatar.url)
-        embed.set_image(url=BANNER_URL)
-
-        await channel.send(embed=embed)
-
-
-# --- KOMENDY SLASH ---
-
-@bot.tree.command(name="say", description="Wysyła wiadomość jako embed")
-async def say(interaction: discord.Interaction, message: str):
-    embed = discord.Embed(description=message, color=0x2b2d31)
-    embed.set_footer(text=f"{bot.user.name} • Today, Ad made by {interaction.user.name}")
-    await interaction.response.send_message(embed=embed)
-
-
-@bot.tree.command(name="bandc", description="Banuje użytkownika")
-@discord.app_commands.checks.has_permissions(ban_members=True)
-async def bandc(interaction: discord.Interaction, target: discord.User, reason: str):
-    await interaction.guild.ban(target, reason=reason)
-    embed = discord.Embed(title="🔨 User has been banned for life", color=0xff0000)
-    embed.add_field(name="👤 User", value=f"<@!{target.id}>", inline=True)
-    embed.add_field(name="🆔 ID", value=f"`{target.id}`", inline=True)
-    embed.add_field(name="🛡️ Administrator", value=f"<@!{interaction.user.id}>", inline=False)
-    embed.add_field(name="📝 Reason", value=f"```\n{reason}\n```", inline=False)
-    embed.set_image(url=BANNER_URL)
-    await interaction.response.send_message(embed=embed)
-
-
-@bot.tree.command(name="unbandc", description="Odbanowuje użytkownika")
-@discord.app_commands.checks.has_permissions(ban_members=True)
-async def unbandc(interaction: discord.Interaction, userid: str, reason: str = "Brak powodu"):
-    user = await bot.fetch_user(int(userid))
-    await interaction.guild.unban(user, reason=reason)
-    embed = discord.Embed(title="🔓 User has been unbanned",
+                f"> Go check out our booster
