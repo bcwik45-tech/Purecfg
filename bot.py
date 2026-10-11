@@ -202,4 +202,35 @@ async def say(interaction: discord.Interaction, message: str):
 
 
 @bot.tree.command(name="bandc", description="Banuje użytkownika")
-@discord
+@discord.app_commands.checks.has_permissions(ban_members=True)
+async def bandc(interaction: discord.Interaction, target: discord.User, reason: str):
+    await interaction.guild.ban(target, reason=reason)
+    embed = discord.Embed(title="🔨 User has been banned for life", color=0xff0000)
+    embed.add_field(name="User", value="<@!" + str(target.id) + ">", inline=True)
+    embed.add_field(name="Reason", value=reason, inline=False)
+    embed.set_image(url=BANNER_URL)
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.tree.command(name="unbandc", description="Odbanowuje użytkownika")
+@discord.app_commands.checks.has_permissions(ban_members=True)
+async def unbandc(interaction: discord.Interaction, userid: str, reason: str = "Brak powodu"):
+    user = await bot.fetch_user(int(userid))
+    await interaction.guild.unban(user, reason=reason)
+    embed = discord.Embed(title="🔓 User has been unbanned", color=0x00ff00)
+    embed.add_field(name="User", value="<@!" + userid + ">", inline=True)
+    embed.set_image(url=BANNER_URL)
+    await interaction.response.send_message(embed=embed)
+
+
+class MidnightCooldown:
+    def __call__(self, interaction: discord.Interaction):
+        now = datetime.now(timezone.utc)
+        tomorrow = datetime.combine(now.date() + timedelta(days=1), time(0, 0), tzinfo=timezone.utc)
+        delta_seconds = int((tomorrow - now).total_seconds())
+        
+        bucket = commands.CooldownMapping.from_cooldown(1, delta_seconds, commands.BucketType.user)
+        retry_after = bucket.update_rate_limit(interaction)
+        if retry_after:
+            raise discord.app_commands.CommandOnCooldown(bucket, retry_after, commands.BucketType.user)
+        return True
