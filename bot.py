@@ -147,7 +147,7 @@ async def before_reminder():
 
 @bot.event
 async def on_ready():
-    print(f"Zalogowano jako {bot.user.name}!")
+    print("Zalogowano pomyślnie!")
     bot.add_view(VerifyView())
     bot.add_view(TicketView())
     bot.add_view(CloseTicketView())
@@ -166,26 +166,16 @@ async def on_member_join(member: discord.Member):
     if not channel:
         return
 
-    created_at = f"<t:{int(member.created_at.timestamp())}:d> <t:{int(member.created_at.timestamp())}:T>"
-    joined_at = f"<t:{int(member.joined_at.timestamp())}:d> <t:{int(member.joined_at.timestamp())}:T>"
+    created_at = f"<t:{int(member.created_at.timestamp())}:d>"
+    joined_at = f"<t:{int(member.joined_at.timestamp())}:d>"
 
     embed = discord.Embed(
         title="New member!",
-        description=(
-            f"🎉 Hi\n<@!{member.id}>\n"
-            f"Welcome to the best cfg in Poland!\n"
-            f"Go check out our stuff!\n\n"
-            f"**You're our {member.guild.member_count} member!**\n\n"
-            f"**Member Info:**\n"
-            f"🪪 **Discord account created:**\n{created_at}\n"
-            f"👤 **Username:** `{member.name}`\n"
-            f"📅 **Joined at:** {joined_at}"
-        ),
+        description="🎉 Hi\n<@!" + str(member.id) + ">\nWelcome to the best cfg in Poland!\nGo check out our stuff!\n\n**You're our " + str(member.guild.member_count) + " member!**",
         color=0x2b2d31
     )
     avatar_url = member.guild.icon.url if member.guild.icon else member.display_avatar.url
     embed.set_thumbnail(url=avatar_url)
-
     await channel.send(embed=embed)
 
 
@@ -198,7 +188,7 @@ async def on_member_update(before: discord.Member, after: discord.Member):
 
         embed = discord.Embed(
             title="💎 New server Boost!",
-            description=(
-                f"<@!{after.id}> **BOOST!**\n"
-                f"> thanks for boosting our server!\n"
-                f"> Go check out our booster
+            description="<@!" + str(after.id) + "> **BOOST!**\n> thanks for boosting our server!\n> Go check out our booster zone!",
+            color=0xff73fa
+        )
+        embed.set_thumbnail(url
