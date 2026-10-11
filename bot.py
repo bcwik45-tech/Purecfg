@@ -140,18 +140,22 @@ class TicketSystemView(discord.ui.View):
         await self.create_ticket_channel(interaction, "Partnership", ROLES_PARTNER, CATEGORY_PARTNER_ID, "🤝")
 
 
-# Zadanie w tle wysyłające przypomnienie co 2 godziny
+# Zadanie w tle wysyłające przypomnienie co 2 godziny wraz z pingiem roli
 @tasks.loop(hours=2)
 async def minigame_reminder():
     channel = bot.get_channel(MINIGAME_CHANNEL_ID)
     if channel:
+        guild = channel.guild
+        role = guild.get_role(ROLE_VERIFIED_ID)
+        role_ping = role.mention if role else f"<@&{ROLE_VERIFIED_ID}>"
+
         embed = discord.Embed(
             title="🎮 Daily Minigame Reminder!",
             description="Hey everyone! Don't forget to test your luck today with `/minigame`! Win amazing rewards and a special role!",
             color=0x3498db
         )
         embed.set_image(url=COLDCFG_BANNER)
-        await channel.send(embed=embed)
+        await channel.send(content=role_ping, embed=embed)
 
 @minigame_reminder.before_loop
 async def before_minigame_reminder():
@@ -201,18 +205,15 @@ async def setup_ticket(interaction: discord.Interaction):
 
 @bot.tree.command(name="minigame", description="Zagraj w minigrę i sprawdź swoje szczęście!")
 async def minigame(interaction: discord.Interaction):
-    # Sprawdzenie czy komenda jest wywoływana na właściwym kanale
     if interaction.channel.id != MINIGAME_CHANNEL_ID:
         await interaction.response.send_message(f"❌ Tej komendy można używać wyłącznie na kanale <#{MINIGAME_CHANNEL_ID}>!", ephemeral=True)
         return
 
-    # Sprawdzenie cooldownu raz dziennie (odnawia się o północy)
     today = date.today()
     if minigame_cooldowns.get(interaction.user.id) == today:
         await interaction.response.send_message("❌ Wykorzystałeś już swoją dzisiejszą próbę w minigrze! Spróbuj ponownie jutro (cooldown odnawia się o północy).", ephemeral=True)
         return
 
-    # Ustawienie dzisiejszej daty jako wykorzystanej dla użytkownika
     minigame_cooldowns[interaction.user.id] = today
 
     win = random.randint(1, 35) == 1
