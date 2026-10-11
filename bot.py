@@ -174,23 +174,4 @@ async def on_member_join(member: discord.Member):
     avatar_url = member.guild.icon.url if member.guild.icon else member.display_avatar.url
     embed.set_thumbnail(url=avatar_url)
 
-    await channel.send(embed=embed)
-
-
-# --- BOOSTY ---
-@bot.event
-async def on_member_update(before: discord.Member, after: discord.Member):
-    if before.premium_since is None and after.premium_since is not None:
-        channel = after.guild.system_channel
-        if not channel:
-            return
-
-        embed = discord.Embed(
-            title="💎 New server Boost!",
-            description=(
-                f"<@!{after.id}> **BOOST!**\n"
-                f"> thanks for boosting our server!\n"
-                f"> Go check out our booster zone!\n\n"
-                f"**Boost Info:**\n"
-                f"🧊 Server Boost level: `{after.guild.premium_tier}`\n"
-                f"🔢
+    await channel.
