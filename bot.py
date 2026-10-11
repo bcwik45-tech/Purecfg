@@ -241,16 +241,21 @@ async def accept(interaction: discord.Interaction, target: discord.Member):
     await interaction.response.send_message(f"Pomyślnie nadano role użytkownikowi <@!{target.id}>!", ephemeral=True)
 
 
-@bot.tree.command(name="setup", description="Wysyła panele weryfikacji i ticketów")
+@bot.tree.command(name="setup_weryfikacja", description="Wysyła panel weryfikacji")
 @discord.app_commands.checks.has_permissions(administrator=True)
-async def setup(interaction: discord.Interaction):
+async def setup_weryfikacja(interaction: discord.Interaction):
     verify_embed = discord.Embed(
         title="Verification",
         description="Click on verification to get access to the channels",
         color=0x2ecc71
     )
     await interaction.channel.send(embed=verify_embed, view=VerifyView())
+    await interaction.response.send_message("Wysłano panel weryfikacji!", ephemeral=True)
 
+
+@bot.tree.command(name="setup_tickets", description="Wysyła panel ticketów")
+@discord.app_commands.checks.has_permissions(administrator=True)
+async def setup_tickets(interaction: discord.Interaction):
     ticket_embed = discord.Embed(
         title="🎫 Tickets",
         description=(
@@ -261,7 +266,7 @@ async def setup(interaction: discord.Interaction):
         color=0x3498db
     )
     await interaction.channel.send(embed=ticket_embed, view=TicketView())
-    await interaction.response.send_message("Wysłano panele!", ephemeral=True)
+    await interaction.response.send_message("Wysłano panel ticketów!", ephemeral=True)
 
 
 bot.run(os.getenv("DISCORD_TOKEN"))
