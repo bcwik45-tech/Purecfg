@@ -89,7 +89,7 @@ class TicketSystemView(discord.ui.View):
         channel = await guild.create_text_channel(
             name=channel_name, 
             overwrites=overwrites, 
-            category=category if isinstance(category, discord.CategoryCategory or discord.CategoryChannel) else None
+            category=category if isinstance(category, discord.CategoryChannel) else None
         )
 
         role_mention = role.mention if role else "@here"
@@ -103,7 +103,6 @@ class TicketSystemView(discord.ui.View):
             color=embed_color
         )
         
-        # Wysłanie wiadomości z pingiem użytkownika oraz roli administracyjnej
         await channel.send(content=f"{user.mention} {role_mention}", embed=embed, view=CloseTicketView())
         await interaction.response.send_message(f"✅ Twój ticket został utworzony: {channel.mention}", ephemeral=True)
 
@@ -160,7 +159,7 @@ async def setup_ticket(interaction: discord.Interaction):
     embed = discord.Embed(
         title="🎟️ Tickets",
         description="Want to place an order, need to contact the owner or staff for help?\nClick the appropriate button below to open a private channel with the administration.\n\nPlease don't open the tickets without a proper reason.",
-        color=0x3498db  # Główny panel niebieski
+        color=0x3498db
     )
     await interaction.channel.send(embed=embed, view=TicketSystemView())
     await interaction.response.send_message("✅ Panel ticketów został wysłany!", ephemeral=True)
@@ -188,6 +187,4 @@ async def minigame(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed)
 
 
-@bot.tree.command(name="say", description="Wyślij wiadomość w czytelnej ramce (Embed).")
-@app_commands.describe(wiadomosc="Treść wiadomości do wysłania")
-async def say(interaction: discord.Interaction, wiadomosc:
+@bot.tree.command(name="say", description="
