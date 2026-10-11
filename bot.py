@@ -1,289 +1,34 @@
-import discord
-from discord.ext import commands, tasks
-import os
-from datetime import datetime, time, timezone, timedelta
-
-# Konfiguracja intentów
-intents = discord.Intents.default()
-intents.guilds = True
-intents.members = True
-intents.bans = True
-intents.message_content = True
-
-bot = commands.Bot(command_prefix="!", intents=intents)
-
-# --- KONFIGURACJA ID ---
-WELCOME_CHANNEL_ID = 1556280506516115466  # Kanał powitań
-BANNER_URL = "https://i.imgur.com/8K5Q62x.png"  # Link do bannera Cold Cfg
-MINIGAME_IMAGE_URL = "https://i.imgur.com/rgprszrgprsz.png" # Obraz z załącznika (lub podmień na właściwy link / załącznik)
-
-# Role i ID
-WINNER_ROLE_ID = 1556565240832073779
-REMIND_ROLE_ID = 1540360249775493230
-
-# Kategorie ticketów
-TICKET_CATEGORIES = {
-    "shop": 1556300130892906506,
-    "owner": 1556300080355606608,
-    "support": 1556300180624769105,
-    "recruitment": 1556300236526329936,
-    "partner": 1556383124424892606
-}
-
-TICKET_EMOJIS = {
-    "shop": "🛒",
-    "owner": "👑",
-    "support": "❓",
-    "recruitment": "📄",
-    "partner": "🤝"
-}
-
-TICKET_ROLES = {
-    "shop": [1540359821323149392],
-    "owner": [1540359821323149392, 1540495893399081061],
-    "support": [1540359821323149392, 1540495893399081061, 1556062543963750400, 1540359905175801946, 1540360086617063584],
-    "recruitment": [1540359821323149392, 1540495893399081061, 1556062543963750400, 1540359905175801946],
-    "partner": [1540359821323149392, 1540495893399081061]
-}
-
-ACCEPT_ROLES = [1540359963346608168, 1540360086617063584]
-
-
-class CloseTicketView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-
-    @discord.ui.button(label="Zamknij ticket 🔒", style=discord.ButtonStyle.danger, custom_id="close_ticket_btn")
-    async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Zamykanie ticketu za 3 sekundy...", ephemeral=True)
-        await discord.utils.sleep_until(discord.utils.utcnow() + discord.timedelta(seconds=3))
-        try:
-            await interaction.channel.delete()
-        except Exception:
-            pass
-
-
-class TicketView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-
-    async def create_ticket(self, interaction: discord.Interaction, ticket_type: str):
-        guild = interaction.guild
-        category_id = TICKET_CATEGORIES.get(ticket_type)
-        category = guild.get_channel(category_id) if category_id else None
-        allowed_role_ids = TICKET_ROLES.get(ticket_type, [])
-        emoji = TICKET_EMOJIS.get(ticket_type, "🎫")
-
-        overwrites = {
-            guild.default_role: discord.PermissionOverwrite(view_channel=False),
-            interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True),
-            guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, manage_channels=True)
-        }
-
-        for r_id in allowed_role_ids:
-            role = guild.get_role(r_id)
-            if role:
-                overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True)
-
-        channel_name = f"{emoji}-ticket-{ticket_type}-{interaction.user.name}".lower()
-        ticket_channel = await guild.create_text_channel(channel_name, category=category, overwrites=overwrites)
-
-        role_pings = " ".join([f"<@&{r_id}>" for r_id in allowed_role_ids])
-
-        embed = discord.Embed(
-            title=f"Ticket: {ticket_type.upper()}",
-            description=f"Witaj <@!{interaction.user.id}>!\nAdministracja wkrótce odpowie na Twoje zgłoszenie.\n\nAby zamknąć ten kanał, kliknij przycisk poniżej.",
-            color=0x2b2d31
-        )
-        await ticket_channel.send(content=f"{role_pings} <@!{interaction.user.id}>", embeds=[embed], view=CloseTicketView())
-        await interaction.response.send_message(f"Utworzono Twój ticket: {ticket_channel.mention}", ephemeral=True)
-
-    @discord.ui.button(label="Shop 🛒", style=discord.ButtonStyle.success, custom_id="ticket_shop")
-    async def shop_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.create_ticket(interaction, "shop")
-
-    @discord.ui.button(label="Owner 👑", style=discord.ButtonStyle.secondary, custom_id="ticket_owner")
-    async def owner_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.create_ticket(interaction, "owner")
-
-    @discord.ui.button(label="Support ❓", style=discord.ButtonStyle.primary, custom_id="ticket_support")
-    async def support_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.create_ticket(interaction, "support")
-
-    @discord.ui.button(label="Recruitment 📄", style=discord.ButtonStyle.danger, custom_id="ticket_recruitment")
-    async def recruitment_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.create_ticket(interaction, "recruitment")
-
-    @discord.ui.button(label="Partnership 🤝", style=discord.ButtonStyle.secondary, custom_id="ticket_partner")
-    async def partner_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.create_ticket(interaction, "partner")
-
-
-class VerifyView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-
-    @discord.ui.button(label="Zweryfikuj", style=discord.ButtonStyle.success, custom_id="verify_btn")
-    async def verify_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        role_id = ACCEPT_ROLES[0]
-        role = interaction.guild.get_role(role_id)
-        if not role:
-            return await interaction.response.send_message("Nie znaleziono roli weryfikacji.", ephemeral=True)
+# Cooldown dynamiczny resetujący się o północy
+class MidnightCooldown:
+    def __call__(self, interaction: discord.Interaction):
+        now = datetime.now(timezone.utc)
+        tomorrow = datetime.combine(now.date() + timedelta(days=1), time(0, 0), tzinfo=timezone.utc)
+        delta_seconds = int((tomorrow - now).total_seconds())
         
-        if role in interaction.user.roles:
-            await interaction.response.send_message("Jesteś już zweryfikowany!", ephemeral=True)
-        else:
-            await interaction.user.add_roles(role)
-            await interaction.response.send_message("Pomyślnie zweryfikowano!", ephemeral=True)
+        # Tworzymy bucket na podstawie ID użytkownika z czasem wygasającym o północy
+        bucket = commands.CooldownMapping.from_cooldown(1, delta_seconds, commands.BucketType.user)
+        retry_after = bucket.update_rate_limit(interaction)
+        if retry_after:
+            raise discord.app_commands.CommandOnCooldown(bucket, retry_after, commands.BucketType.user)
+        return True
 
-
-# Pętla wysyłająca przypomnienie co 2 godziny z pingiem roli
-@tasks.loop(hours=2)
-async def minigame_reminder():
-    for guild in bot.guilds:
-        # Możesz zmienić system_channel na konkretny ID kanału, jeśli wolisz
-        channel = guild.system_channel
-        if channel:
-            await channel.send(f"⏰ <@&{REM_ROLE_ID}> Czas na odświeżenie szans! Użyj komendy `/minigame`, aby spróbować wygrać nagrodę!")
-
-@minigame_reminder.before_loop
-async def before_reminder():
-    await bot.wait_until_ready()
-
-
-@bot.event
-async def on_ready():
-    print(f"Zalogowano jako {bot.user.name}!")
-    bot.add_view(VerifyView())
-    bot.add_view(TicketView())
-    bot.add_view(CloseTicketView())
-    if not minigame_reminder.is_running():
-        minigame_reminder.start()
-    try:
-        synced = await bot.tree.sync()
-        print(f"Zsynchronizowano {len(synced)} komend slash.")
-    except Exception as e:
-        print(e)
-
-
-# --- POWITANIA ---
-@bot.event
-async def on_member_join(member: discord.Member):
-    channel = member.guild.get_channel(WELCOME_CHANNEL_ID)
-    if not channel:
-        return
-
-    created_at = f"<t:{int(member.created_at.timestamp())}:d> <t:{int(member.created_at.timestamp())}:T>"
-    joined_at = f"<t:{int(member.joined_at.timestamp())}:d> <t:{int(member.joined_at.timestamp())}:T>"
-
-    embed = discord.Embed(
-        title="New member!",
-        description=(
-            f"🎉 Hi\n<@!{member.id}>\n"
-            f"Welcome to the best cfg in Poland!\n"
-            f"Go check out our stuff!\n\n"
-            f"**You're our {member.guild.member_count} member!**\n\n"
-            f"**Member Info:**\n"
-            f"🪪 **Discord account created:**\n{created_at}\n"
-            f"👤 **Username:** `{member.name}`\n"
-            f"📅 **Joined at:** {joined_at}"
-        ),
-        color=0x2b2d31
-    )
-    avatar_url = member.guild.icon.url if member.guild.icon else member.display_avatar.url
-    embed.set_thumbnail(url=avatar_url)
-
-    await channel.send(embed=embed)
-
-
-# --- BOOSTY ---
-@bot.event
-async def on_member_update(before: discord.Member, after: discord.Member):
-    if before.premium_since is None and after.premium_since is not None:
-        channel = after.guild.system_channel
-        if not channel:
-            return
-
-        embed = discord.Embed(
-            title="💎 New server Boost!",
-            description=(
-                f"<@!{after.id}> **BOOST!**\n"
-                f"> thanks for boosting our server!\n"
-                f"> Go check out our booster zone!\n\n"
-                f"**Boost Info:**\n"
-                f"🧊 Server Boost level: `{after.guild.premium_tier}`\n"
-                f"🔢 Boost count: `{after.guild.premium_subscription_count}`"
-            ),
-            color=0xff73fa
-        )
-        embed.set_thumbnail(url=after.display_avatar.url)
-        embed.set_image(url=BANNER_URL)
-
-        await channel.send(embed=embed)
-
-
-# --- KOMENDY SLASH ---
-
-@bot.tree.command(name="say", description="Wysyła wiadomość jako embed")
-async def say(interaction: discord.Interaction, message: str):
-    embed = discord.Embed(description=message, color=0x2b2d31)
-    embed.set_footer(text=f"{bot.user.name} • Today, Ad made by {interaction.user.name}")
-    await interaction.response.send_message(embed=embed)
-
-
-@bot.tree.command(name="bandc", description="Banuje użytkownika")
-@discord.app_commands.checks.has_permissions(ban_members=True)
-async def bandc(interaction: discord.Interaction, target: discord.User, reason: str):
-    await interaction.guild.ban(target, reason=reason)
-    embed = discord.Embed(title="🔨 User has been banned for life", color=0xff0000)
-    embed.add_field(name="👤 User", value=f"<@!{target.id}>", inline=True)
-    embed.add_field(name="🆔 ID", value=f"`{target.id}`", inline=True)
-    embed.add_field(name="🛡️ Administrator", value=f"<@!{interaction.user.id}>", inline=False)
-    embed.add_field(name="📝 Reason", value=f"```\n{reason}\n```", inline=False)
-    embed.set_image(url=BANNER_URL)
-    await interaction.response.send_message(embed=embed)
-
-
-@bot.tree.command(name="unbandc", description="Odbanowuje użytkownika")
-@discord.app_commands.checks.has_permissions(ban_members=True)
-async def unbandc(interaction: discord.Interaction, userid: str, reason: str = "Brak powodu"):
-    user = await bot.fetch_user(int(userid))
-    await interaction.guild.unban(user, reason=reason)
-    embed = discord.Embed(title="🔓 User has been unbanned", color=0x00ff00)
-    embed.add_field(name="👤 User", value=f"<@!{userid}>", inline=True)
-    embed.add_field(name="🆔 ID", value=f"`{userid}`", inline=True)
-    embed.add_field(name="🛡️ Administrator", value=f"<@!{interaction.user.id}>", inline=False)
-    embed.add_field(name="📝 Reason", value=f"```\n{reason}\n```", inline=False)
-    embed.set_image(url=BANNER_URL)
-    await interaction.response.send_message(embed=embed)
-
-
-# Cooldown resetujący się o północy (24:00)
-def midnight_cooldown(interaction: discord.Interaction):
-    now = datetime.now(timezone.utc)
-    # Obliczaj czas do następnej północy
-    tomorrow = datetime.combine(now.date() + timedelta(days=1), time(0, 0), tzinfo=timezone.utc)
-    delta_seconds = (tomorrow - now).total_seconds()
-    
-    # Tworzymy unikalny klucz cooldownu dla użytkownika na dany dzień
-    bucket = commands.CooldownMapping.from_cooldown(1, delta_seconds, commands.BucketType.user)
-    retry_after = bucket.update_rate_limit(interaction)
-    if retry_after:
-        return commands.CooldownByPass(retry_after) # Zwraca czas do resetu
-    return None
+midnight_cd = MidnightCooldown()
 
 @bot.tree.command(name="minigame", description="Losowanie nagrody w Cold Cfg")
-@commands.cooldown(1, 86400, commands.BucketType.user) # Zabezpieczenie podstawowe
 async def minigame(interaction: discord.Interaction):
-    # Sprawdzamy cooldown do północy
-    now = datetime.now(timezone.utc)
-    midnight = datetime.combine(now.date() + timedelta(days=1), time(0, 0), tzinfo=timezone.utc)
-    remaining = int((midnight - now).total_seconds())
+    # Sprawdzamy i aktualizujemy cooldown o północy
+    try:
+        midnight_cd(interaction)
+    except discord.app_commands.CommandOnCooldown as error:
+        hours = int(error.retry_after // 3600)
+        minutes = int((error.retry_after % 3600) // 60)
+        return await interaction.response.send_message(
+            f"⏳ Możesz zagrać ponownie dopiero po północy! Spróbuj za ok. {hours}h {minutes}m.",
+            ephemeral=True
+        )
 
-    # Przykładowa szansa na wygraną (np. ustawiona na wygraną, możesz zmienić logikę losowania)
-    # Dla testu lub symulacji załóżmy, że dajemy szansę albo wygraną
     import random
-    won = random.choice([False, False, True]) # 1 szansa na 3
+    won = random.choice([False, False, True]) # Szansa na wygraną
 
     if won:
         role = interaction.guild.get_role(WINNER_ROLE_ID)
@@ -314,54 +59,3 @@ async def minigame(interaction: discord.Interaction):
     embed.set_thumbnail(url=interaction.user.display_avatar.url)
     embed.set_image(url=MINIGAME_IMAGE_URL)
     await interaction.response.send_message(embed=embed)
-
-@minigame.error
-async def minigame_error(interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
-    if isinstance(error, discord.app_commands.CommandOnCooldown):
-        hours = int(error.retry_after // 3600)
-        minutes = int((error.retry_after % 3600) // 60)
-        await interaction.response.send_message(
-            f"⏳ Możesz zagrać ponownie dopiero po północy! Spróbuj za ok. {hours}h {minutes}m.",
-            ephemeral=True
-        )
-
-
-@bot.tree.command(name="accept", description="Accept candidate and give roles")
-@discord.app_commands.checks.has_permissions(manage_roles=True)
-async def accept(interaction: discord.Interaction, target: discord.Member):
-    for r_id in ACCEPT_ROLES:
-        role = interaction.guild.get_role(r_id)
-        if role:
-            await target.add_roles(role)
-    await interaction.response.send_message(f"Pomyślnie nadano role użytkownikowi <@!{target.id}>!", ephemeral=True)
-
-
-@bot.tree.command(name="setup_weryfikacja", description="Wysyła panel weryfikacji")
-@discord.app_commands.checks.has_permissions(administrator=True)
-async def setup_weryfikacja(interaction: discord.Interaction):
-    verify_embed = discord.Embed(
-        title="Verification",
-        description="Click on verification to get access to the channels",
-        color=0x2ecc71
-    )
-    await interaction.channel.send(embed=verify_embed, view=VerifyView())
-    await interaction.response.send_message("Wysłano panel weryfikacji!", ephemeral=True)
-
-
-@bot.tree.command(name="setup_tickets", description="Wysyła panel ticketów")
-@discord.app_commands.checks.has_permissions(administrator=True)
-async def setup_tickets(interaction: discord.Interaction):
-    ticket_embed = discord.Embed(
-        title="🎫 Tickets",
-        description=(
-            "Want to place an order, need to contact the owner or staff for help?\n"
-            "Click the appropriate button below to open a private channel with the administration.\n\n"
-            "Please don't open the tickets without a proper reason."
-        ),
-        color=0x3498db
-    )
-    await interaction.channel.send(embed=ticket_embed, view=TicketView())
-    await interaction.response.send_message("Wysłano panel ticketów!", ephemeral=True)
-
-
-bot.run(os.getenv("DISCORD_TOKEN"))
