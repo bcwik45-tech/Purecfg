@@ -13,6 +13,7 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 COLDCFG_BANNER = "https://i.imgur.com/your_coldcfg_banner.png"
+MINIGAME_BANNER = "TUTAJ_WKLEJ_LINK_DO_OBRAZKA_Z_NAPISEM_COLDCFG"  # <-- Wklej tutaj link do obrazka z wiśnią i napisem ColdCfg
 COLDCFG_BOOST_BANNER = "https://i.imgur.com/your_coldcfg_boosts.png"
 THUMBNAIL_URL = "https://i.imgur.com/your_thumbnail.png"
 
@@ -154,7 +155,7 @@ async def minigame_reminder():
             description="Hey everyone! Don't forget to test your luck today with `/minigame`! Win amazing rewards and a special role!",
             color=0x3498db
         )
-        embed.set_image(url=COLDCFG_BANNER)
+        embed.set_image(url=MINIGAME_BANNER)
         await channel.send(content=role_ping, embed=embed)
 
 @minigame_reminder.before_loop
@@ -238,8 +239,11 @@ async def minigame(interaction: discord.Interaction):
             color=0x2b2d31
         )
 
+    # Miniaturka (mały obrazek w prawym górnym rogu) to awatar użytkownika
     embed.set_thumbnail(url=interaction.user.display_avatar.url)
-    embed.set_image(url=COLDCFG_BANNER)
+    # Baner (duży obrazek na dole) to grafika z napisem ColdCfg
+    embed.set_image(url=MINIGAME_BANNER)
+    
     await interaction.response.send_message(embed=embed)
 
 
