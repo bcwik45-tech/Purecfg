@@ -5,27 +5,21 @@ import random
 import asyncio
 import os
 
-# Uprawnienia bota (Intents)
 intents = discord.Intents.default()
-intents.members = True          # Wymagane do weryfikacji, powitań i boostów
+intents.members = True
 intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# ==========================================
-# KONFIGURACJA ID I LINKÓW (PODMIEŃ LINKI NA WŁASNE)
-# ==========================================
-COLDCFG_BANNER = "https://i.imgur.com/your_coldcfg_banner.png"        # Banner COLDCFG
-COLDCFG_BOOST_BANNER = "https://i.imgur.com/your_coldcfg_boosts.png"   # Banner dla Boostów
-THUMBNAIL_URL = "https://i.imgur.com/your_thumbnail.png"              # Miniaturka / memik
+COLDCFG_BANNER = "https://i.imgur.com/your_coldcfg_banner.png"
+COLDCFG_BOOST_BANNER = "https://i.imgur.com/your_coldcfg_boosts.png"
+THUMBNAIL_URL = "https://i.imgur.com/your_thumbnail.png"
 
-WELCOME_CHANNEL_ID = 123456789012345678  # ID kanału do powitań
-BOOST_CHANNEL_ID = 123456789012345678    # ID kanału powiadomień o boostach
+WELCOME_CHANNEL_ID = 123456789012345678
+BOOST_CHANNEL_ID = 123456789012345678
 
-# ID ROLI DO WERYFIKACJI
 ROLE_VERIFIED_ID = 1540360249775493230
 
-# ID RÓL DLA TICKETÓW
 ROLE_SHOP_ID = 1556300130892906506
 ROLE_RECRUITMENT_ID = 1556300236526329936
 ROLE_OWNER_ID = 1556300080355606608
@@ -33,9 +27,6 @@ ROLE_SUPPORT_ID = 1556300180624769105
 ROLE_PARTNER_ID = 1556383124424892606
 
 
-# ==========================================
-# 1. WERYFIKACJA (PRZYCISK & VIEW)
-# ==========================================
 class VerifyView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -53,9 +44,6 @@ class VerifyView(discord.ui.View):
             await interaction.response.send_message("❌ Błąd: Nie znaleziono roli do weryfikacji.", ephemeral=True)
 
 
-# ==========================================
-# 2. SYSTEM TICKETÓW (PRZYCISKI & VIEW)
-# ==========================================
 class CloseTicketView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -117,13 +105,9 @@ class TicketSystemView(discord.ui.View):
         await self.create_ticket_channel(interaction, "Partnership", ROLE_PARTNER_ID)
 
 
-# ==========================================
-# ON_READY
-# ==========================================
 @bot.event
 async def on_ready():
     print(f"✅ Coldcfg Bot zalogowany jako {bot.user.name}")
-    
     bot.add_view(VerifyView())
     bot.add_view(TicketSystemView())
     bot.add_view(CloseTicketView())
@@ -134,10 +118,6 @@ async def on_ready():
     except Exception as e:
         print(f"❌ Błąd synchronizacji komend: {e}")
 
-
-# ==========================================
-# KOMENDY SETUP
-# ==========================================
 
 @bot.tree.command(name="setup_weryfikacja", description="Tworzy panel weryfikacji na kanale.")
 @app_commands.checks.has_permissions(administrator=True)
@@ -156,20 +136,12 @@ async def setup_weryfikacja(interaction: discord.Interaction):
 async def setup_ticket(interaction: discord.Interaction):
     embed = discord.Embed(
         title="🎟️ Tickets",
-        description=(
-            "Want to place an order, need to contact the owner or staff for help?\n"
-            "Click the appropriate button below to open a private channel with the administration.\n\n"
-            "Please don't open the tickets without a proper reason."
-        ),
+        description="Want to place an order, need to contact the owner or staff for help?\nClick the appropriate button below to open a private channel with the administration.\n\nPlease don't open the tickets without a proper reason.",
         color=0xf1c40f
     )
     await interaction.channel.send(embed=embed, view=TicketSystemView())
     await interaction.response.send_message("✅ Panel ticketów został wysłany!", ephemeral=True)
 
-
-# ==========================================
-# KOMENDY UŻYTKOWE
-# ==========================================
 
 @bot.tree.command(name="minigame", description="Zagraj w minigrę i sprawdź swoje szczęście!")
 async def minigame(interaction: discord.Interaction):
@@ -184,6 +156,76 @@ async def minigame(interaction: discord.Interaction):
     else:
         embed = discord.Embed(
             title="🐱 We're sorry!",
-            description=(
-                f"{interaction.user.mention}, **this time you didn't win anything.** "
-                f"Try your luck again tomorrow!\n\n"
+            description=f"{interaction.user.mention}, **this time you didn't win anything.** Try your luck again tomorrow!\n\n**Some Info:**\n*Your chance was **1** in **35**.*\n\n*We wish you better luck next time!*",
+            color=0x2b2d31
+        )
+
+    embed.set_thumbnail(url=THUMBNAIL_URL)
+    embed.set_image(url=COLDCFG_BANNER)
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.tree.command(name="say", description="Wyślij wiadomość w czytelnej ramce (Embed).")
+@app_commands.describe(wiadomosc="Treść wiadomości do wysłania")
+async def say(interaction: discord.Interaction, wiadomosc: str):
+    embed = discord.Embed(description=wiadomosc, color=0x2b2d31)
+    embed.set_footer(text=f"Coldcfg • Today at {interaction.created_at.strftime('%H:%M')}, Ad made by {interaction.user.display_name}")
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.tree.command(name="bandc", description="Banuje użytkownika i tworzy raport o banie.")
+@app_commands.describe(user="Użytkownik do zabanowania", reason="Powód bana")
+@app_commands.checks.has_permissions(ban_members=True)
+async def bandc(interaction: discord.Interaction, user: discord.Member, reason: str = "mrbeast"):
+    embed = discord.Embed(title="🔨 User has been banned for life", color=discord.Color.red())
+    embed.add_field(name="👤 User", value=user.mention, inline=True)
+    embed.add_field(name="🆔 ID", value=f"`{user.id}`", inline=True)
+    embed.add_field(name="🛡️ Administrator", value=interaction.user.mention, inline=False)
+    embed.add_field(name="📝 Reason", value=f"```\n{reason}\n```", inline=False)
+    embed.set_image(url=COLDCFG_BANNER)
+    embed.set_footer(text=f"COLDCFG Security • Today at {interaction.created_at.strftime('%H:%M')}")
+
+    try:
+        await user.ban(reason=f"{reason} (Wystawił: {interaction.user})")
+        await interaction.response.send_message(embed=embed)
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Nie udało się zabanować: {e}", ephemeral=True)
+
+
+@bot.event
+async def on_member_join(member: discord.Member):
+    channel = member.guild.get_channel(WELCOME_CHANNEL_ID)
+    if channel:
+        created_at = member.created_at.strftime("%d.%m.%Y %H:%M:%S")
+        joined_at = member.joined_at.strftime("%d %B %Y %H:%M") if member.joined_at else "Now"
+
+        embed = discord.Embed(
+            title="New member!",
+            description=f"🎉 Hi\n{member.mention}\nWelcome to the best cfg in Poland!\nGo check out our stuff!\n\n**You're our {member.guild.member_count} member!**\n\n**Member Info:**\n🪪 **Discord account created:**\n{created_at}\n👤 **Username:** `{member.name}`\n📅 **Joined at:** {joined_at}",
+            color=0x2b2d31
+        )
+        embed.set_thumbnail(url=THUMBNAIL_URL)
+        await channel.send(embed=embed)
+
+
+@bot.event
+async def on_member_update(before: discord.Member, after: discord.Member):
+    if before.premium_since is None and after.premium_since is not None:
+        channel = after.guild.get_channel(BOOST_CHANNEL_ID)
+        if channel:
+            guild = after.guild
+            embed = discord.Embed(
+                title="⚙️ New server Boost!",
+                description=f"{after.mention} **BOOST!**\n> thanks for boosting our server!\n> Go check out our booster zone!\n\n**Boost Info:**\n🧊 **Server Boost level:** `{guild.premium_tier}`\n🔢 **Boost count:** `{guild.premium_subscription_count}`",
+                color=0xff73fa
+            )
+            embed.set_thumbnail(url=THUMBNAIL_URL)
+            embed.set_image(url=COLDCFG_BOOST_BANNER)
+            await channel.send(embed=embed)
+
+
+TOKEN = os.getenv("DISCORD_TOKEN")
+if TOKEN:
+    bot.run(TOKEN)
+else:
+    print("❌ BŁĄD: Brak zmiennej DISCORD_TOKEN w Variables na Railway!")
