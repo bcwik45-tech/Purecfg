@@ -166,9 +166,6 @@ async def on_member_join(member: discord.Member):
     if not channel:
         return
 
-    created_at = f"<t:{int(member.created_at.timestamp())}:d>"
-    joined_at = f"<t:{int(member.joined_at.timestamp())}:d>"
-
     embed = discord.Embed(
         title="New member!",
         description="🎉 Hi\n<@!" + str(member.id) + ">\nWelcome to the best cfg in Poland!\nGo check out our stuff!\n\n**You're our " + str(member.guild.member_count) + " member!**",
@@ -191,4 +188,18 @@ async def on_member_update(before: discord.Member, after: discord.Member):
             description="<@!" + str(after.id) + "> **BOOST!**\n> thanks for boosting our server!\n> Go check out our booster zone!",
             color=0xff73fa
         )
-        embed.set_thumbnail(url
+        avatar_url = after.guild.icon.url if after.guild.icon else after.display_avatar.url
+        embed.set_thumbnail(url=avatar_url)
+        embed.set_image(url=BANNER_URL)
+        await channel.send(embed=embed)
+
+
+@bot.tree.command(name="say", description="Wysyła wiadomość jako embed")
+async def say(interaction: discord.Interaction, message: str):
+    embed = discord.Embed(description=message, color=0x2b2d31)
+    embed.set_footer(text="Bot • Ad made by " + interaction.user.name)
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.tree.command(name="bandc", description="Banuje użytkownika")
+@discord
