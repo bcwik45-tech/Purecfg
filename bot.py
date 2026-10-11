@@ -283,12 +283,54 @@ async def on_member_join(member: discord.Member):
         created_at = member.created_at.strftime("%d.%m.%Y %H:%M:%S")
         joined_at = member.joined_at.strftime("%d %B %Y %H:%M") if member.joined_at else "Now"
 
+        desc = (
+            "🎉 Hi\n" + member.mention + "\n"
+            "Welcome to the best cfg in Poland!\n"
+            "Go check out our stuff!\n\n"
+            "**You're our " + str(member.guild.member_count) + " member!**\n\n"
+            "**Member Info:**\n"
+            "🪪 **Discord account created:**\n" + created_at + "\n"
+            "👤 **Username:** `" + member.name + "`\n"
+            "📅 **Joined at:** " + joined_at
+        )
+
         embed = discord.Embed(
             title="New member!",
-            description=(
-                f"🎉 Hi\n{member.mention}\n"
-                "Welcome to the best cfg in Poland!\n"
-                "Go check out our stuff!\n\n"
-                f"**You're our {member.guild.member_count} member!**\n\n"
-                "**Member Info:**\n"
-                f"🪪 **Discord account created:**\n{created_
+            description=desc,
+            color=0x2b2d31
+        )
+        embed.set_thumbnail(url=member.display_avatar.url)
+        await channel.send(embed=embed)
+
+
+@bot.event
+async def on_member_update(before: discord.Member, after: discord.Member):
+    if before.premium_since is None and after.premium_since is not None:
+        channel = after.guild.get_channel(BOOST_CHANNEL_ID)
+        if channel:
+            guild = after.guild
+            
+            boost_desc = (
+                f"{after.mention} **BOOST!**\n"
+                "> thanks for boosting our server!\n"
+                "> Go check out our booster zone!\n\n"
+                "**Boost Info:**\n"
+                f"🧊 **Server Boost level:** `{guild.premium_tier}`\n"
+                f"🔢 **Boost count:** `{guild.premium_subscription_count}`"
+            )
+            
+            embed = discord.Embed(
+                title="⚙️ New server Boost!",
+                description=boost_desc,
+                color=0xff73fa
+            )
+            embed.set_thumbnail(url=after.display_avatar.url)
+            embed.set_image(url=COLDCFG_BOOST_BANNER)
+            await channel.send(embed=embed)
+
+
+TOKEN = os.getenv("DISCORD_TOKEN")
+if TOKEN:
+    bot.run(TOKEN)
+else:
+    print("❌ BŁĄD: Brak zmiennej DISCORD_TOKEN w Variables na Railway!")
