@@ -281,4 +281,17 @@ async def setup_weryfikacja(interaction: discord.Interaction):
 @bot.tree.command(name="setup_tickets", description="Wysyła panel ticketów")
 @discord.app_commands.checks.has_permissions(administrator=True)
 async def setup_tickets(interaction: discord.Interaction):
-    ticket_embed = discord.Embed
+    ticket_embed = discord.Embed(
+        title="🎫 Tickets",
+        description=(
+            "Want to place an order, need to contact the owner or staff for help?\n"
+            "Click the appropriate button below to open a private channel with the administration.\n\n"
+            "Please don't open the tickets without a proper reason."
+        ),
+        color=0x3498db
+    )
+    await interaction.channel.send(embed=ticket_embed, view=TicketView())
+    await interaction.response.send_message("Wysłano panel ticketów!", ephemeral=True)
+
+
+bot.run(os.getenv("DISCORD_TOKEN"))
