@@ -73,7 +73,6 @@ class TicketSystemView(discord.ui.View):
         super().__init__(timeout=None)
 
     async def create_ticket_channel(self, interaction: discord.Interaction, ticket_type: str, role_ids: list, category_id: int, emoji: str):
-        # Odroczenie odpowiedzi, by zapobiec wygaśnięciu interakcji (3s limit Discorda)
         await interaction.response.defer(ephemeral=True)
 
         guild = interaction.guild
@@ -94,7 +93,6 @@ class TicketSystemView(discord.ui.View):
                 roles_mentions.append(role.mention)
 
         channel_name = f"{emoji}-{ticket_type.lower()}-{user.name}"
-        
         target_category = category if isinstance(category, discord.CategoryChannel) else None
 
         channel = await guild.create_text_channel(
@@ -245,6 +243,28 @@ async def on_member_update(before: discord.Member, after: discord.Member):
         channel = after.guild.get_channel(BOOST_CHANNEL_ID)
         if channel:
             guild = after.guild
+            
+            boost_desc = (
+                f"{after.mention} **BOOST!**\n"
+                "> thanks for boosting our server!\n"
+                "> Go check out our booster zone!\n\n"
+                "**Boost Info:**\n"
+                f"🧊 **Server Boost level:** `{guild.premium_tier}`\n"
+                f"🔢 **Boost count:** `{guild.premium_subscription_count}`"
+            )
+            
             embed = discord.Embed(
                 title="⚙️ New server Boost!",
-                description=f"{after.mention} **BOOST!**\n> thanks for boosting our server!\n> Go check out our booster zone!\n\n
+                description=boost_desc,
+                color=0xff73fa
+            )
+            embed.set_thumbnail(url=THUMBNAIL_URL)
+            embed.set_image(url=COLDCFG_BOOST_BANNER)
+            await channel.send(embed=embed)
+
+
+TOKEN = os.getenv("DISCORD_TOKEN")
+if TOKEN:
+    bot.run(TOKEN)
+else:
+    print("❌ BŁĄD: Brak zmiennej DISCORD_TOKEN w Variables na Railway!")
