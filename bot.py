@@ -1,6 +1,7 @@
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 import os
+from datetime import datetime, time, timezone, timedelta
 
 # Konfiguracja intentów
 intents = discord.Intents.default()
@@ -14,6 +15,11 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # --- KONFIGURACJA ID ---
 WELCOME_CHANNEL_ID = 1556280506516115466  # Kanał powitań
 BANNER_URL = "https://i.imgur.com/8K5Q62x.png"  # Link do bannera Cold Cfg
+MINIGAME_IMAGE_URL = "https://i.imgur.com/rgprszrgprsz.png" # Obraz z załącznika (lub podmień na właściwy link / załącznik)
+
+# Role i ID
+WINNER_ROLE_ID = 1556565240832073779
+REMIND_ROLE_ID = 1540360249775493230
 
 # Kategorie ticketów
 TICKET_CATEGORIES = {
@@ -24,7 +30,6 @@ TICKET_CATEGORIES = {
     "partner": 1556383124424892606
 }
 
-# Emotki dla poszczególnych kategorii do nazwy kanału
 TICKET_EMOJIS = {
     "shop": "🛒",
     "owner": "👑",
@@ -33,7 +38,6 @@ TICKET_EMOJIS = {
     "partner": "🤝"
 }
 
-# Role mające dostęp do poszczególnych ticketów
 TICKET_ROLES = {
     "shop": [1540359821323149392],
     "owner": [1540359821323149392, 1540495893399081061],
@@ -42,7 +46,6 @@ TICKET_ROLES = {
     "partner": [1540359821323149392, 1540495893399081061]
 }
 
-# Role nadawane przez komendę /accept
 ACCEPT_ROLES = [1540359963346608168, 1540360086617063584]
 
 
@@ -134,12 +137,28 @@ class VerifyView(discord.ui.View):
             await interaction.response.send_message("Pomyślnie zweryfikowano!", ephemeral=True)
 
 
+# Pętla wysyłająca przypomnienie co 2 godziny z pingiem roli
+@tasks.loop(hours=2)
+async def minigame_reminder():
+    for guild in bot.guilds:
+        # Możesz zmienić system_channel na konkretny ID kanału, jeśli wolisz
+        channel = guild.system_channel
+        if channel:
+            await channel.send(f"⏰ <@&{REM_ROLE_ID}> Czas na odświeżenie szans! Użyj komendy `/minigame`, aby spróbować wygrać nagrodę!")
+
+@minigame_reminder.before_loop
+async def before_reminder():
+    await bot.wait_until_ready()
+
+
 @bot.event
 async def on_ready():
     print(f"Zalogowano jako {bot.user.name}!")
     bot.add_view(VerifyView())
     bot.add_view(TicketView())
     bot.add_view(CloseTicketView())
+    if not minigame_reminder.is_running():
+        minigame_reminder.start()
     try:
         synced = await bot.tree.sync()
         print(f"Zsynchronizowano {len(synced)} komend slash.")
@@ -239,21 +258,72 @@ async def unbandc(interaction: discord.Interaction, userid: str, reason: str = "
     await interaction.response.send_message(embed=embed)
 
 
+# Cooldown resetujący się o północy (24:00)
+def midnight_cooldown(interaction: discord.Interaction):
+    now = datetime.now(timezone.utc)
+    # Obliczaj czas do następnej północy
+    tomorrow = datetime.combine(now.date() + timedelta(days=1), time(0, 0), tzinfo=timezone.utc)
+    delta_seconds = (tomorrow - now).total_seconds()
+    
+    # Tworzymy unikalny klucz cooldownu dla użytkownika na dany dzień
+    bucket = commands.CooldownMapping.from_cooldown(1, delta_seconds, commands.BucketType.user)
+    retry_after = bucket.update_rate_limit(interaction)
+    if retry_after:
+        return commands.CooldownByPass(retry_after) # Zwraca czas do resetu
+    return None
+
 @bot.tree.command(name="minigame", description="Losowanie nagrody w Cold Cfg")
+@commands.cooldown(1, 86400, commands.BucketType.user) # Zabezpieczenie podstawowe
 async def minigame(interaction: discord.Interaction):
-    embed = discord.Embed(
-        title="🐱 We're sorry!",
-        description=(
-            f"<@!{interaction.user.id}>, this time you didn't win anything. Try your luck again tomorrow!\n\n"
-            f"**Some Info:**\n"
-            f"*Your chance was* **1** *in* **35**.\n\n"
-            f"*We wish you better luck next time!*"
-        ),
-        color=0x2b2d31
-    )
+    # Sprawdzamy cooldown do północy
+    now = datetime.now(timezone.utc)
+    midnight = datetime.combine(now.date() + timedelta(days=1), time(0, 0), tzinfo=timezone.utc)
+    remaining = int((midnight - now).total_seconds())
+
+    # Przykładowa szansa na wygraną (np. ustawiona na wygraną, możesz zmienić logikę losowania)
+    # Dla testu lub symulacji załóżmy, że dajemy szansę albo wygraną
+    import random
+    won = random.choice([False, False, True]) # 1 szansa na 3
+
+    if won:
+        role = interaction.guild.get_role(WINNER_ROLE_ID)
+        if role:
+            await interaction.user.add_roles(role)
+        
+        embed = discord.Embed(
+            title="🎉 Gratulacje! Wygrana!",
+            description=(
+                f"<@!{interaction.user.id}>, udało Ci się wygrać w minigrze!\n"
+                f"Otrzymałeś specjalną rangę nagrody!\n\n"
+                f"*Wpadnij ponownie po północy na kolejne losowanie!*"
+            ),
+            color=0x2ecc71
+        )
+    else:
+        embed = discord.Embed(
+            title="🐱 We're sorry!",
+            description=(
+                f"<@!{interaction.user.id}>, this time you didn't win anything. Try your luck again tomorrow!\n\n"
+                f"**Some Info:**\n"
+                f"*Your chance was* **1** *in* **35**.\n\n"
+                f"*We wish you better luck next time!*"
+            ),
+            color=0x2b2d31
+        )
+
     embed.set_thumbnail(url=interaction.user.display_avatar.url)
-    embed.set_image(url=BANNER_URL)
+    embed.set_image(url=MINIGAME_IMAGE_URL)
     await interaction.response.send_message(embed=embed)
+
+@minigame.error
+async def minigame_error(interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
+    if isinstance(error, discord.app_commands.CommandOnCooldown):
+        hours = int(error.retry_after // 3600)
+        minutes = int((error.retry_after % 3600) // 60)
+        await interaction.response.send_message(
+            f"⏳ Możesz zagrać ponownie dopiero po północy! Spróbuj za ok. {hours}h {minutes}m.",
+            ephemeral=True
+        )
 
 
 @bot.tree.command(name="accept", description="Accept candidate and give roles")
