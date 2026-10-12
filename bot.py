@@ -12,6 +12,8 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 WELCOME_CHANNEL_ID = 1556280506516115466
+BOOST_CHANNEL_ID = 1540358387219304592
+REMIND_CHANNEL_ID = 1556566161653764157
 IMG_URL = "https://i.imgur.com/rgprszrgprsz.png"
 
 WINNER_ROLE_ID = 1556565240832073779
@@ -135,7 +137,7 @@ class VerifyView(discord.ui.View):
 @tasks.loop(hours=2)
 async def minigame_reminder():
     for guild in bot.guilds:
-        channel = guild.system_channel
+        channel = guild.get_channel(REMIND_CHANNEL_ID)
         if channel:
             await channel.send(f"<@&{REM_ROLE_ID}> Czas na odswiezenie szans! Uzyj komendy `/minigame`, aby sprobowac wygrac nagrode!")
 
@@ -178,7 +180,7 @@ async def on_member_join(member: discord.Member):
 @bot.event
 async def on_member_update(before: discord.Member, after: discord.Member):
     if before.premium_since is None and after.premium_since is not None:
-        channel = after.guild.system_channel
+        channel = after.guild.get_channel(BOOST_CHANNEL_ID)
         if not channel:
             return
 
