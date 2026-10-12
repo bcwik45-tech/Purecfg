@@ -87,11 +87,11 @@ class TicketView(discord.ui.View):
 
         embed = discord.Embed(
             title=f"Ticket: {ticket_type.upper()}",
-            description=f"Witaj <@!{interaction.user.id}>!\nAdministracja wkrótce odpowie na Twoje zgłoszenie.\n\nAby zamknąć ten kanał, kliknij przycisk poniżej.",
+            description=f"Witaj <@!{interaction.user.id}>!\nAdministracja wkrótce odpowie na Twoje zgloszenie.\n\nAby zamknac ten kanal, kliknij przycisk ponizej.",
             color=0x2b2d31
         )
         await ticket_channel.send(content=f"{role_pings} <@!{interaction.user.id}>", embeds=[embed], view=CloseTicketView())
-        await interaction.response.send_message(f"Utworzono Twój ticket: {ticket_channel.mention}", ephemeral=True)
+        await interaction.response.send_message(f"Utworzono Twoj ticket: {ticket_channel.mention}", ephemeral=True)
 
     @discord.ui.button(label="Shop 🛒", style=discord.ButtonStyle.success, custom_id="ticket_shop")
     async def shop_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -137,7 +137,7 @@ async def minigame_reminder():
     for guild in bot.guilds:
         channel = guild.system_channel
         if channel:
-            await channel.send(f"⏰ <@&{REM_ROLE_ID}> Czas na odswiezenie szans! Uzyj komendy `/minigame`, aby spróbowac wygrac nagrode!")
+            await channel.send(f"⏰ <@&{REM_ROLE_ID}> Czas na odswiezenie szans! Uzyj komendy `/minigame`, aby sprobowac wygrac nagrode!")
 
 @minigame_reminder.before_loop
 async def before_reminder():
@@ -245,7 +245,7 @@ async def minigame(interaction: discord.Interaction):
         hours = int(error.retry_after // 3600)
         minutes = int((error.retry_after % 3600) // 60)
         return await interaction.response.send_message(
-            f"Mozesz zagrać ponownie dopiero jutro! Spróbuj za ok. {hours}h {minutes}m.",
+            f"Mozesz zagrać ponownie dopiero jutro! Sprobuj za ok. {hours}h {minutes}m.",
             ephemeral=True
         )
 
@@ -259,4 +259,34 @@ async def minigame(interaction: discord.Interaction):
         
         embed = discord.Embed(
             title="🎉 Gratulacje! Wygrana!",
-            description="Udało Ci się wygrać w minigrze i
+            description="Udalo Ci sie wygrac w minigrze i otrzymujesz specjalna range!",
+            color=0x2ecc71
+        )
+    else:
+        embed = discord.Embed(
+            title="🐱 We're sorry!",
+            description="This time you didn't win anything. Try your luck again tomorrow!",
+            color=0x2b2d31
+        )
+
+    embed.set_thumbnail(url=interaction.user.display_avatar.url)
+    embed.set_image(url=IMG_URL)
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.tree.command(name="accept", description="Accept candidate and give roles")
+@discord.app_commands.checks.has_permissions(manage_roles=True)
+async def accept(interaction: discord.Interaction, target: discord.Member):
+    for r_id in ACCEPT_ROLES:
+        role = interaction.guild.get_role(r_id)
+        if role:
+            await target.add_roles(role)
+    await interaction.response.send_message(f"Pomyslnie nadano role uzytkownikowi <@!{target.id}>!", ephemeral=True)
+
+
+@bot.tree.command(name="setup_weryfikacja", description="Wysyła panel weryfikacji")
+@discord.app_commands.checks.has_permissions(administrator=True)
+async def setup_weryfikacja(interaction: discord.Interaction):
+    verify_embed = discord.Embed(title="Verification", description="Click on verification to get access", color=0x2ecc71)
+    await interaction.channel.send(embed=verify_embed, view=VerifyView())
+    await interaction.response.send_message
