@@ -12,8 +12,7 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 WELCOME_CHANNEL_ID = 1556280506516115466
-BANNER_URL = "https://cdn.discordapp.com/attachments/1542538146116403380/1559229958461595709/Gemini_Generated_Image_rgprszrgprszrgpr.jpg?ex=6ace518f&is=6acd000f&hm=0f91264bf5a94c8f57a49b47c21f2703d95e41b5b1959917bca0282e9bb57814&"
-MINIGAME_IMAGE_URL = "https://cdn.discordapp.com/attachments/1542538146116403380/1559229958461595709/Gemini_Generated_Image_rgprszrgprszrgpr.jpg?ex=6ace518f&is=6acd000f&hm=0f91264bf5a94c8f57a49b47c21f2703d95e41b5b1959917bca0282e9bb57814&"
+IMG_URL = "https://i.imgur.com/rgprszrgprsz.png"
 
 WINNER_ROLE_ID = 1556565240832073779
 REM_ROLE_ID = 1540360249775493230
@@ -119,4 +118,131 @@ class VerifyView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="Zwery
+    @discord.ui.button(label="Zweryfikuj", style=discord.ButtonStyle.success, custom_id="verify_btn")
+    async def verify_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        role_id = ACCEPT_ROLES[0]
+        role = interaction.guild.get_role(role_id)
+        if not role:
+            return await interaction.response.send_message("Nie znaleziono roli weryfikacji.", ephemeral=True)
+        
+        if role in interaction.user.roles:
+            await interaction.response.send_message("Jesteś już zweryfikowany!", ephemeral=True)
+        else:
+            await interaction.user.add_roles(role)
+            await interaction.response.send_message("Pomyślnie zweryfikowano!", ephemeral=True)
+
+
+@tasks.loop(hours=2)
+async def minigame_reminder():
+    for guild in bot.guilds:
+        channel = guild.system_channel
+        if channel:
+            await channel.send(f"⏰ <@&{REM_ROLE_ID}> Czas na odświeżenie szans! Użyj komendy `/minigame`, aby spróbować wygrać nagrodę!")
+
+@minigame_reminder.before_loop
+async def before_reminder():
+    await bot.wait_until_ready()
+
+
+@bot.event
+async def on_ready():
+    print("Zalogowano pomyślnie!")
+    bot.add_view(VerifyView())
+    bot.add_view(TicketView())
+    bot.add_view(CloseTicketView())
+    if not minigame_reminder.is_running():
+        minigame_reminder.start()
+    try:
+        synced = await bot.tree.sync()
+        print(f"Zsynchronizowano {len(synced)} komend slash.")
+    except Exception as e:
+        print(e)
+
+
+@bot.event
+async def on_member_join(member: discord.Member):
+    channel = member.guild.get_channel(WELCOME_CHANNEL_ID)
+    if not channel:
+        return
+
+    embed = discord.Embed(
+        title="New member!",
+        description="🎉 Hi\n<@!" + str(member.id) + ">\nWelcome to the best cfg in Poland!\nGo check out our stuff!\n\n**You're our " + str(member.guild.member_count) + " member!**",
+        color=0x2b2d31
+    )
+    avatar_url = member.guild.icon.url if member.guild.icon else member.display_avatar.url
+    embed.set_thumbnail(url=avatar_url)
+    await channel.send(embed=embed)
+
+
+@bot.event
+async def on_member_update(before: discord.Member, after: discord.Member):
+    if before.premium_since is None and after.premium_since is not None:
+        channel = after.guild.system_channel
+        if not channel:
+            return
+
+        embed = discord.Embed(
+            title="💎 New server Boost!",
+            description="<@!" + str(after.id) + "> **BOOST!**\n> thanks for boosting our server!\n> Go check out our booster zone!",
+            color=0xff73fa
+        )
+        avatar_url = after.guild.icon.url if after.guild.icon else after.display_avatar.url
+        embed.set_thumbnail(url=avatar_url)
+        embed.set_image(url=IMG_URL)
+        await channel.send(embed=embed)
+
+
+@bot.tree.command(name="say", description="Wysyła wiadomość jako embed")
+async def say(interaction: discord.Interaction, message: str):
+    embed = discord.Embed(description=message, color=0x2b2d31)
+    embed.set_footer(text="Bot • Ad made by " + interaction.user.name)
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.tree.command(name="bandc", description="Banuje użytkownika")
+@discord.app_commands.checks.has_permissions(ban_members=True)
+async def bandc(interaction: discord.Interaction, target: discord.User, reason: str):
+    await interaction.guild.ban(target, reason=reason)
+    embed = discord.Embed(title="🔨 User has been banned for life", color=0xff0000)
+    embed.add_field(name="User", value="<@!" + str(target.id) + ">", inline=True)
+    embed.add_field(name="Reason", value=reason, inline=False)
+    embed.set_image(url=IMG_URL)
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.tree.command(name="unbandc", description="Odbanowuje użytkownika")
+@discord.app_commands.checks.has_permissions(ban_members=True)
+async def unbandc(interaction: discord.Interaction, userid: str, reason: str = "Brak powodu"):
+    user = await bot.fetch_user(int(userid))
+    await interaction.guild.unban(user, reason=reason)
+    embed = discord.Embed(title="🔓 User has been unbanned", color=0x00ff00)
+    embed.add_field(name="User", value="<@!" + userid + ">", inline=True)
+    embed.set_image(url=IMG_URL)
+    await interaction.response.send_message(embed=embed)
+
+
+class MidnightCooldown:
+    def __call__(self, interaction: discord.Interaction):
+        now = datetime.now(timezone.utc)
+        tomorrow = datetime.combine(now.date() + timedelta(days=1), time(0, 0), tzinfo=timezone.utc)
+        delta_seconds = int((tomorrow - now).total_seconds())
+        
+        bucket = commands.CooldownMapping.from_cooldown(1, delta_seconds, commands.BucketType.user)
+        retry_after = bucket.update_rate_limit(interaction)
+        if retry_after:
+            raise discord.app_commands.CommandOnCooldown(bucket, retry_after, commands.BucketType.user)
+        return True
+
+midnight_cd = MidnightCooldown()
+
+
+@bot.tree.command(name="minigame", description="Losowanie nagrody w Cold Cfg")
+async def minigame(interaction: discord.Interaction):
+    try:
+        midnight_cd(interaction)
+    except discord.app_commands.CommandOnCooldown as error:
+        hours = int(error.retry_after // 3600)
+        minutes = int((error.retry_after % 3600) // 60)
+        return await interaction.response.send_message(
+            f"⏳ Możesz zagrać ponownie dopiero po półn
