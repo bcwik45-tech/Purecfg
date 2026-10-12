@@ -126,10 +126,10 @@ class VerifyView(discord.ui.View):
             return await interaction.response.send_message("Nie znaleziono roli weryfikacji.", ephemeral=True)
         
         if role in interaction.user.roles:
-            await interaction.response.send_message("Jesteś już zweryfikowany!", ephemeral=True)
+            await interaction.response.send_message("Jestes juz zweryfikowany!", ephemeral=True)
         else:
             await interaction.user.add_roles(role)
-            await interaction.response.send_message("Pomyślnie zweryfikowano!", ephemeral=True)
+            await interaction.response.send_message("Pomyslnie zweryfikowano!", ephemeral=True)
 
 
 @tasks.loop(hours=2)
@@ -137,7 +137,7 @@ async def minigame_reminder():
     for guild in bot.guilds:
         channel = guild.system_channel
         if channel:
-            await channel.send(f"⏰ <@&{REM_ROLE_ID}> Czas na odświeżenie szans! Użyj komendy `/minigame`, aby spróbować wygrać nagrodę!")
+            await channel.send(f"⏰ <@&{REM_ROLE_ID}> Czas na odswiezenie szans! Uzyj komendy `/minigame`, aby spróbowac wygrac nagrode!")
 
 @minigame_reminder.before_loop
 async def before_reminder():
@@ -146,7 +146,7 @@ async def before_reminder():
 
 @bot.event
 async def on_ready():
-    print("Zalogowano pomyślnie!")
+    print("Zalogowano pomyslnie!")
     bot.add_view(VerifyView())
     bot.add_view(TicketView())
     bot.add_view(CloseTicketView())
@@ -245,4 +245,18 @@ async def minigame(interaction: discord.Interaction):
         hours = int(error.retry_after // 3600)
         minutes = int((error.retry_after % 3600) // 60)
         return await interaction.response.send_message(
-            f"⏳ Możesz zagrać ponownie dopiero po półn
+            f"Mozesz zagrać ponownie dopiero jutro! Spróbuj za ok. {hours}h {minutes}m.",
+            ephemeral=True
+        )
+
+    import random
+    won = random.choice([False, False, True])
+
+    if won:
+        role = interaction.guild.get_role(WINNER_ROLE_ID)
+        if role:
+            await interaction.user.add_roles(role)
+        
+        embed = discord.Embed(
+            title="🎉 Gratulacje! Wygrana!",
+            description="Udało Ci się wygrać w minigrze i
