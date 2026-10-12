@@ -176,3 +176,32 @@ async def on_member_join(member: discord.Member):
 
 
 @bot.event
+async def on_member_update(before: discord.Member, after: discord.Member):
+    if before.premium_since is None and after.premium_since is not None:
+        channel = after.guild.system_channel
+        if not channel:
+            return
+
+        embed = discord.Embed(
+            title="💎 New server Boost!",
+            description="<@!" + str(after.id) + "> **BOOST!**\n> thanks for boosting our server!\n> Go check out our booster zone!",
+            color=0xff73fa
+        )
+        avatar_url = after.guild.icon.url if after.guild.icon else after.display_avatar.url
+        embed.set_thumbnail(url=avatar_url)
+        embed.set_image(url=IMG_URL)
+        await channel.send(embed=embed)
+
+
+@bot.tree.command(name="say", description="Wysyła wiadomość jako embed")
+async def say(interaction: discord.Interaction, message: str):
+    embed = discord.Embed(description=message, color=0x2b2d31)
+    embed.set_footer(text="Bot • Ad made by " + interaction.user.name)
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.tree.command(name="bandc", description="Banuje użytkownika")
+@discord.app_commands.checks.has_permissions(ban_members=True)
+async def bandc(interaction: discord.Interaction, target: discord.User, reason: str):
+    await interaction.guild.ban(target, reason=reason)
+    embed
