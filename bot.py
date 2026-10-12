@@ -144,4 +144,71 @@ async def before_reminder():
     await bot.wait_until_ready()
 
 
-@bot
+@bot.event
+async def on_ready():
+    print("Zalogowano pomyslnie!")
+    bot.add_view(VerifyView())
+    bot.add_view(TicketView())
+    bot.add_view(CloseTicketView())
+    if not minigame_reminder.is_running():
+        minigame_reminder.start()
+    try:
+        synced = await bot.tree.sync()
+        print(f"Zsynchronizowano {len(synced)} komend slash.")
+    except Exception as e:
+        print(e)
+
+
+@bot.event
+async def on_member_join(member: discord.Member):
+    channel = member.guild.get_channel(WELCOME_CHANNEL_ID)
+    if not channel:
+        return
+
+    embed = discord.Embed(
+        title="New member!",
+        description="🎉 Hi\n<@!" + str(member.id) + ">\nWelcome to the best cfg in Poland!\nGo check out our stuff!\n\n**You're our " + str(member.guild.member_count) + " member!**",
+        color=0x2b2d31
+    )
+    avatar_url = member.guild.icon.url if member.guild.icon else member.display_avatar.url
+    embed.set_thumbnail(url=avatar_url)
+    await channel.send(embed=embed)
+
+
+@bot.event
+async def on_member_update(before: discord.Member, after: discord.Member):
+    if before.premium_since is None and after.premium_since is not None:
+        channel = after.guild.system_channel
+        if not channel:
+            return
+
+        embed = discord.Embed(
+            title="💎 New server Boost!",
+            description="<@!" + str(after.id) + "> **BOOST!**\n> thanks for boosting our server!\n> Go check out our booster zone!",
+            color=0xff73fa
+        )
+        avatar_url = after.guild.icon.url if after.guild.icon else after.display_avatar.url
+        embed.set_thumbnail(url=avatar_url)
+        embed.set_image(url=IMG_URL)
+        await channel.send(embed=embed)
+
+
+@bot.tree.command(name="say", description="Wysyła wiadomość jako embed")
+async def say(interaction: discord.Interaction, message: str):
+    embed = discord.Embed(description=message, color=0x2b2d31)
+    embed.set_footer(text="Bot • Ad made by " + interaction.user.name)
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.tree.command(name="bandc", description="Banuje użytkownika")
+@discord.app_commands.checks.has_permissions(ban_members=True)
+async def bandc(interaction: discord.Interaction, target: discord.User, reason: str):
+    await interaction.guild.ban(target, reason=reason)
+    embed = discord.Embed(title="🔨 User has been banned for life", color=0xff0000)
+    embed.add_field(name="User", value="<@!" + str(target.id) + ">", inline=True)
+    embed.add_field(name="Reason", value=reason, inline=False)
+    embed.set_image(url=IMG_URL)
+    await interaction.response.send_message(embed=embed)
+
+
+@
