@@ -65,4 +65,19 @@ class CloseTicketView(discord.ui.View):
         super().__init__(timeout=None)
 
     @discord.ui.button(label="Zamknij ticket 🔒", style=discord.ButtonStyle.danger, custom_id="close_ticket_btn")
-    async def close_button(self, interaction
+    async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("Zamykanie i usuwanie ticketu...", ephemeral=True)
+        try:
+            await interaction.channel.delete()
+        except Exception as e:
+            print(f"Błąd przy zamykaniu ticketu: {e}")
+
+
+class TicketView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    async def create_ticket(self, interaction: discord.Interaction, ticket_type: str):
+        guild = interaction.guild
+        category_id = TICKET_CATEGORIES.get(ticket_type)
+        category = guild.get_channel(category
