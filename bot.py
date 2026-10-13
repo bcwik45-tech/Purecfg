@@ -167,5 +167,39 @@ async def on_member_join(member: discord.Member):
     if not channel:
         return
 
-    created_at = member.created_at.strftime("%d.%m.%Y %H:%M:%S")
-    joined_at = member.joined_at.strftime("%d.%m.%Y %H:%
+    desc = f"🎉 Hi\n<@!{member.id}>\nWelcome to the best cfg in Poland!\nGo check out our stuff!\n\n**You're our {member.guild.member_count} member!**\n\n**Username:** `{member.name}`"
+
+    embed = discord.Embed(
+        title="New member!",
+        description=desc,
+        color=0x2b2d31
+    )
+    embed.set_thumbnail(url=member.display_avatar.url)
+    await channel.send(embed=embed)
+
+
+@bot.event
+async def on_member_update(before: discord.Member, after: discord.Member):
+    if before.premium_since is None and after.premium_since is not None:
+        channel = after.guild.get_channel(BOOST_CHANNEL_ID)
+        if not channel:
+            return
+
+        embed = discord.Embed(
+            title="New server Boost!",
+            description=f"<@!{after.id}> BOOST!\n> thanks for boosting our server!\n> Go check out our booster zone!",
+            color=0xff73fa
+        )
+        embed.set_thumbnail(url=after.display_avatar.url)
+        embed.set_image(url=IMG_URL)
+        await channel.send(embed=embed)
+
+
+@bot.tree.command(name="say", description="Wysyła wiadomość jako embed")
+async def say(interaction: discord.Interaction, message: str):
+    embed = discord.Embed(description=message, color=0x2b2d31)
+    embed.set_footer(text=f"Bot • Ad made by {interaction.user.name}")
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.tree.command(name="bandc", description="Banuje użytk
