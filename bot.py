@@ -8,8 +8,12 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
+        self.send_header("Content-type", "text/plain")
         self.end_headers()
-        self.wfile.write(b"COLDCFG Bot is Online!")
+        self.wfile.write(b"OK")
+
+    def log_message(self, format, *args):
+        return  # Wyłączenie zaśmiecania logów zapytaniami healthchecka
 
 def run_web_server():
     port = int(os.environ.get("PORT", 8080))
@@ -101,15 +105,4 @@ class TicketView(discord.ui.View):
         embed = discord.Embed(
             title=f"Ticket: {ticket_type.upper()}",
             description=f"Witaj <@!{interaction.user.id}>!\nAdministracja wkrótce odpowie na Twoje zgłoszenie.\n\nAby zamknąć ten kanał, kliknij przycisk poniżej.",
-            color=0x2b2d31
-        )
-        await ticket_channel.send(content=f"{role_pings} <@!{interaction.user.id}>", embeds=[embed], view=CloseTicketView())
-        await interaction.response.send_message(f"Utworzono Twój ticket: {ticket_channel.mention}", ephemeral=True)
-
-    @discord.ui.button(label="Shop 🛒", style=discord.ButtonStyle.success, custom_id="ticket_shop")
-    async def shop_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.create_ticket(interaction, "shop")
-
-    @discord.ui.button(label="Owner 👑", style=discord.ButtonStyle.secondary, custom_id="ticket_owner")
-    async def owner_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.create_ticket(interaction, "owner")
+            color=0x
