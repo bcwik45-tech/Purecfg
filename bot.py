@@ -9,15 +9,13 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"Bot is online and running!")
+        self.wfile.write(b"COLDCFG Bot is Online!")
 
 def run_web_server():
     port = int(os.environ.get("PORT", 8080))
     server = HTTPServer(("0.0.0.0", port), HealthCheckHandler)
+    print(f"Serwer HTTP uruchomiony na porcie {port}")
     server.serve_forever()
-
-threading.Thread(target=run_web_server, daemon=True).start()
-# -------------------------------------------------------------
 
 intents = discord.Intents.default()
 intents.guilds = True
@@ -78,6 +76,4 @@ class TicketView(discord.ui.View):
         super().__init__(timeout=None)
 
     async def create_ticket(self, interaction: discord.Interaction, ticket_type: str):
-        guild = interaction.guild
-        category_id = TICKET_CATEGORIES.get(ticket_type)
-        category = guild.get_channel(category
+        guild =
