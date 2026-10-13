@@ -13,7 +13,7 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
         self.wfile.write(b"OK")
 
     def log_message(self, format, *args):
-        return  # Wyłączenie zaśmiecania logów zapytaniami healthchecka
+        return  # Wyłączenie logowania zapytań healthchecka
 
 def run_web_server():
     port = int(os.environ.get("PORT", 8080))
@@ -105,4 +105,64 @@ class TicketView(discord.ui.View):
         embed = discord.Embed(
             title=f"Ticket: {ticket_type.upper()}",
             description=f"Witaj <@!{interaction.user.id}>!\nAdministracja wkrótce odpowie na Twoje zgłoszenie.\n\nAby zamknąć ten kanał, kliknij przycisk poniżej.",
-            color=0x
+            color=0x2b2d31
+        )
+        await ticket_channel.send(content=f"{role_pings} <@!{interaction.user.id}>", embeds=[embed], view=CloseTicketView())
+        await interaction.response.send_message(f"Utworzono Twój ticket: {ticket_channel.mention}", ephemeral=True)
+
+    @discord.ui.button(label="Shop 🛒", style=discord.ButtonStyle.success, custom_id="ticket_shop")
+    async def shop_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.create_ticket(interaction, "shop")
+
+    @discord.ui.button(label="Owner 👑", style=discord.ButtonStyle.secondary, custom_id="ticket_owner")
+    async def owner_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.create_ticket(interaction, "owner")
+
+    @discord.ui.button(label="Support ❓", style=discord.ButtonStyle.primary, custom_id="ticket_support")
+    async def support_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.create_ticket(interaction, "support")
+
+    @discord.ui.button(label="Recruitment 📄", style=discord.ButtonStyle.danger, custom_id="ticket_recruitment")
+    async def recruitment_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.create_ticket(interaction, "recruitment")
+
+    @discord.ui.button(label="Partnership 🤝", style=discord.ButtonStyle.secondary, custom_id="ticket_partner")
+    async def partner_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.create_ticket(interaction, "partner")
+
+
+class VerifyView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Zweryfikuj", style=discord.ButtonStyle.success, custom_id="verify_btn")
+    async def verify_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        role_id = ACCEPT_ROLES[0]
+        role = interaction.guild.get_role(role_id)
+        if not role:
+            return await interaction.response.send_message("Nie znaleziono roli weryfikacji.", ephemeral=True)
+        
+        if role in interaction.user.roles:
+            await interaction.response.send_message("Jesteś już zweryfikowany!", ephemeral=True)
+        else:
+            await interaction.user.add_roles(role)
+            await interaction.response.send_message("Pomyślnie zweryfikowano!", ephemeral=True)
+
+
+@bot.event
+async def on_ready():
+    print("Zalogowano pomyślnie!")
+    bot.add_view(VerifyView())
+    bot.add_view(TicketView())
+    bot.add_view(CloseTicketView())
+    try:
+        synced = await bot.tree.sync()
+        print(f"Zsynchronizowano {len(synced)} komend slash.")
+    except Exception as e:
+        print(e)
+
+
+@bot.event
+async def on_member_join(member: discord.Member):
+    channel = member.guild.get_channel(WELCOME_CHANNEL_ID)
+    if not channel:
