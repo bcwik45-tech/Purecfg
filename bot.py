@@ -59,7 +59,8 @@ TICKET_ROLES = {
     "partner": [1540359821323149392, 1540495893399081061]
 }
 
-ACCEPT_ROLES = [1540359963346608168, 1540360086617063584]
+# Zaktualizowana rola weryfikacji na wskazane ID
+ACCEPT_ROLES = [1540360249775493230]
 
 
 class CloseTicketView(discord.ui.View):
