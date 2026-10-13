@@ -166,3 +166,146 @@ async def on_ready():
 async def on_member_join(member: discord.Member):
     channel = member.guild.get_channel(WELCOME_CHANNEL_ID)
     if not channel:
+        return
+
+    created_str = member.created_at.strftime("%d.%m.%Y %H:%M:%S")
+    joined_str = member.joined_at.strftime("%d.%m.%Y %H:%M:%S") if member.joined_at else "N/A"
+
+    desc = (
+        f"🎉 Hi\n"
+        f"<@!{member.id}>\n"
+        f"Welcome to the best cfg in Poland!\n"
+        f"Go check out our stuff!\n\n"
+        f"**You're our {member.guild.member_count} member!**\n\n"
+        f"**Member Info:**\n"
+        f"🪪 **Discord account created:**\n"
+        f"`{created_str}`\n"
+        f"👤 **Username:** `{member.name}`\n"
+        f"📅 **Joined at:** `{joined_str}`"
+    )
+
+    embed = discord.Embed(
+        title="New member!",
+        description=desc,
+        color=0x2b2d31
+    )
+    embed.set_thumbnail(url=member.display_avatar.url)
+    await channel.send(embed=embed)
+
+
+@bot.event
+async def on_member_update(before: discord.Member, after: discord.Member):
+    if before.premium_since is None and after.premium_since is not None:
+        channel = after.guild.get_channel(BOOST_CHANNEL_ID)
+        if not channel:
+            return
+
+        embed = discord.Embed(
+            title="New server Boost!",
+            description=f"<@!{after.id}> BOOST!\n> thanks for boosting our server!\n> Go check out our booster zone!",
+            color=0xff73fa
+        )
+        embed.set_thumbnail(url=after.display_avatar.url)
+        embed.set_image(url=IMG_URL)
+        await channel.send(embed=embed)
+
+
+@bot.tree.command(name="say", description="Send message as embed")
+async def say(interaction: discord.Interaction, message: str):
+    embed = discord.Embed(description=message, color=0x2b2d31)
+    embed.set_footer(text=f"Bot • Ad made by {interaction.user.name}")
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.tree.command(name="bandc", description="Ban user permanently")
+@discord.app_commands.checks.has_permissions(ban_members=True)
+async def bandc(interaction: discord.Interaction, target: discord.User, reason: str):
+    await interaction.guild.ban(target, reason=reason)
+    embed = discord.Embed(title="User has been banned for life", color=0xff0000)
+    embed.add_field(name="User", value=f"<@!{target.id}>", inline=True)
+    embed.add_field(name="Reason", value=reason, inline=False)
+    embed.set_image(url=IMG_URL)
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.tree.command(name="unbandc", description="Unban user from server")
+@discord.app_commands.checks.has_permissions(ban_members=True)
+async def unbandc(interaction: discord.Interaction, userid: str, reason: str = "Brak powodu"):
+    user = await bot.fetch_user(int(userid))
+    await interaction.guild.unban(user, reason=reason)
+    embed = discord.Embed(title="User has been unbanned", color=0x00ff00)
+    embed.add_field(name="User", value=f"<@!{userid}>", inline=True)
+    embed.set_image(url=IMG_URL)
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.tree.command(name="minigame", description="Try your luck in Cold Cfg minigame")
+@discord.app_commands.checks.cooldown(1, 86400)
+async def minigame(interaction: discord.Interaction):
+    import random
+    won = random.choice([True] + [False] * 9)
+
+    if won:
+        role = interaction.guild.get_role(WINNER_ROLE_ID)
+        if role:
+            await interaction.user.add_roles(role)
+        
+        embed = discord.Embed(
+            title="Gratulacje! Wygrana!",
+            description="Udało Ci się wygrać w minigrze i otrzymujesz specjalną rangę!",
+            color=0x2ecc71
+        )
+    else:
+        embed = discord.Embed(
+            title="We are sorry!",
+            description="This time you didn't win anything. Try your luck again tomorrow!",
+            color=0x2b2d31
+        )
+
+    embed.set_thumbnail(url=interaction.user.display_avatar.url)
+    embed.set_image(url=IMG_URL)
+    await interaction.response.send_message(content=f"<@!{interaction.user.id}>", embed=embed)
+
+@minigame.error
+async def minigame_error(interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
+    if isinstance(error, discord.app_commands.CommandOnCooldown):
+        hours = int(error.retry_after // 3600)
+        minutes = int((error.retry_after % 3600) // 60)
+        await interaction.response.send_message(
+            f"Możesz zagrać ponownie dopiero za ok. {hours}h {minutes}m!",
+            ephemeral=True
+        )
+
+
+@bot.tree.command(name="accept", description="Accept candidate and give roles")
+@discord.app_commands.checks.has_permissions(manage_roles=True)
+async def accept(interaction: discord.Interaction, target: discord.Member):
+    for r_id in ACCEPT_ROLES:
+        role = interaction.guild.get_role(r_id)
+        if role:
+            await target.add_roles(role)
+    await interaction.response.send_message(f"Pomyślnie nadano rolę użytkownikowi <@!{target.id}>!", ephemeral=True)
+
+
+@bot.tree.command(name="setup_weryfikacja", description="Send verification panel")
+@discord.app_commands.checks.has_permissions(administrator=True)
+async def setup_weryfikacja(interaction: discord.Interaction):
+    verify_embed = discord.Embed(title="Verification", description="Click on verification to get access", color=0x2ecc71)
+    await interaction.channel.send(embed=verify_embed, view=VerifyView())
+    await interaction.response.send_message("Wysłano panel weryfikacji!", ephemeral=True)
+
+
+@bot.tree.command(name="setup_tickets", description="Send tickets panel")
+@discord.app_commands.checks.has_permissions(administrator=True)
+async def setup_tickets(interaction: discord.Interaction):
+    ticket_embed = discord.Embed(title="Tickets", description="Click a button to open a ticket.", color=0x3498db)
+    await interaction.channel.send(embed=ticket_embed, view=TicketView())
+    await interaction.response.send_message("Wysłano panel biletów!", ephemeral=True)
+
+
+def start_bot():
+    bot.run(os.getenv("DISCORD_TOKEN"))
+
+if __name__ == "__main__":
+    threading.Thread(target=start_bot, daemon=True).start()
+    run_web_server()
