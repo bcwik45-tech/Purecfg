@@ -76,4 +76,40 @@ class TicketView(discord.ui.View):
         super().__init__(timeout=None)
 
     async def create_ticket(self, interaction: discord.Interaction, ticket_type: str):
-        guild =
+        guild = interaction.guild
+        category_id = TICKET_CATEGORIES.get(ticket_type)
+        category = guild.get_channel(category_id) if category_id else None
+        allowed_role_ids = TICKET_ROLES.get(ticket_type, [])
+        emoji = TICKET_EMOJIS.get(ticket_type, "🎫")
+
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True),
+            guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, manage_channels=True)
+        }
+
+        for r_id in allowed_role_ids:
+            role = guild.get_role(r_id)
+            if role:
+                overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True)
+
+        channel_name = f"{emoji}-ticket-{ticket_type}-{interaction.user.name}".lower()
+        ticket_channel = await guild.create_text_channel(channel_name, category=category, overwrites=overwrites)
+
+        role_pings = " ".join([f"<@&{r_id}>" for r_id in allowed_role_ids])
+
+        embed = discord.Embed(
+            title=f"Ticket: {ticket_type.upper()}",
+            description=f"Witaj <@!{interaction.user.id}>!\nAdministracja wkrótce odpowie na Twoje zgłoszenie.\n\nAby zamknąć ten kanał, kliknij przycisk poniżej.",
+            color=0x2b2d31
+        )
+        await ticket_channel.send(content=f"{role_pings} <@!{interaction.user.id}>", embeds=[embed], view=CloseTicketView())
+        await interaction.response.send_message(f"Utworzono Twój ticket: {ticket_channel.mention}", ephemeral=True)
+
+    @discord.ui.button(label="Shop 🛒", style=discord.ButtonStyle.success, custom_id="ticket_shop")
+    async def shop_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.create_ticket(interaction, "shop")
+
+    @discord.ui.button(label="Owner 👑", style=discord.ButtonStyle.secondary, custom_id="ticket_owner")
+    async def owner_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.create_ticket(interaction, "owner")
