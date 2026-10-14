@@ -31,7 +31,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 WELCOME_CHANNEL_ID = 1556280506516115466
 BOOST_CHANNEL_ID = 1540358387219304592
-IMG_URL = "https://i.imgur.com/rgprszrgprsz.png"
+IMG_URL = "https://cdn.discordapp.com/attachments/1548988126452781137/1559839172653490246/coldcfg.gif"
 
 WINNER_ROLE_ID = 1556565240832073779
 
@@ -59,7 +59,6 @@ TICKET_ROLES = {
     "partner": [1540359821323149392, 1540495893399081061]
 }
 
-# Zaktualizowana rola weryfikacji na wskazane ID
 ACCEPT_ROLES = [1540360249775493230]
 
 
