@@ -1,6 +1,26 @@
 import discord
 from discord.ext import commands, tasks
 import os
+from http.server import HTTPServer, BaseHTTPRequestHandler
+import threading
+
+# --- PROSTY SERWER HTTP DLA RAILWAY ---
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot is running!")
+    def log_message(self, format, *args):
+        pass
+
+def run_http_server():
+    port = int(os.environ.get("PORT", 8080))
+    server = HTTPServer(("0.0.0.0", port), HealthCheckHandler)
+    server.serve_forever()
+
+# Uruchomienie serwera w tle, żeby Railway widział działający port
+threading.Thread(target=run_http_server, daemon=True).start()
+# --------------------------------------
 
 intents = discord.Intents.default()
 intents.guilds = True
@@ -12,7 +32,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 WELCOME_CHANNEL_ID = 1556280506516115466
 BOOST_CHANNEL_ID = 1540358387219304592
-MINIGAME_CHANNEL_ID = 0  # <--- Wpisz tutaj ID kanału dla minigry, np. 123456789123456789
+MINIGAME_CHANNEL_ID = 0  # <--- Wpisz tutaj ID kanału dla minigry
 IMG_URL = "https://cdn.discordapp.com/attachments/1548988126452781137/1559839172653490246/coldcfg.gif"
 WINNER_ROLE_ID = 1556565240832073779
 ACCEPT_ROLE_ID = 1560349104893206568
@@ -114,3 +134,69 @@ class VerifyView(discord.ui.View):
         role = interaction.guild.get_role(ACCEPT_ROLE_ID)
         if not role:
             return await interaction.response.send_message("Nie znaleziono roli weryfikacji.", ephemeral=True)
+        
+        if role in interaction.user.roles:
+            await interaction.response.send_message("Jesteś już zweryfikowany!", ephemeral=True)
+        else:
+            await interaction.user.add_roles(role)
+            await interaction.response.send_message("Pomyślnie zweryfikowano!", ephemeral=True)
+
+
+@tasks.loop(hours=24)
+async def minigame_daily_reminder():
+    if MINIGAME_CHANNEL_ID == 0:
+        return
+    channel = bot.get_channel(MINIGAME_CHANNEL_ID)
+    if channel:
+        embed = discord.Embed(
+            title="Daily reminder 🦦",
+            description="Use /minigame to win an award! Booster gets something more!",
+            color=0x2b2d31
+        )
+        await channel.send(embed=embed)
+
+
+@bot.event
+async def on_ready():
+    print(f"Zalogowano jako {bot.user}!")
+    bot.add_view(VerifyView())
+    bot.add_view(TicketView())
+    bot.add_view(CloseTicketView())
+    if not minigame_daily_reminder.is_running():
+        minigame_daily_reminder.start()
+    try:
+        synced = await bot.tree.sync()
+        print(f"Zsynchronizowano {len(synced)} komend slash.")
+    except Exception as e:
+        print(e)
+
+
+@bot.event
+async def on_member_join(member: discord.Member):
+    channel = member.guild.get_channel(WELCOME_CHANNEL_ID)
+    if not channel:
+        return
+
+    created_str = member.created_at.strftime("%d.%m.%Y %H:%M:%S")
+    joined_str = member.joined_at.strftime("%d.%m.%Y %H:%M:%S") if member.joined_at else "N/A"
+
+    desc = (
+        f"🎉 Hi\n"
+        f"<@!{member.id}>\n"
+        f"Welcome to the best cfg in Poland!\n"
+        f"Go check out our stuff!\n\n"
+        f"**You're our {member.guild.member_count} member!**\n\n"
+        f"**Member Info:**\n"
+        f"🪪 **Discord account created:**\n"
+        f"`{created_str}`\n"
+        f"👤 **Username:** `{member.name}`\n"
+        f"📅 **Joined at:** `{joined_str}`"
+    )
+
+    embed = discord.Embed(title="New member!", description=desc, color=0x2b2d31)
+    embed.set_thumbnail(url=member.display_avatar.url)
+    await channel.send(embed=embed)
+
+
+@bot.event
+async def on_member_update(before: discord.Member,
