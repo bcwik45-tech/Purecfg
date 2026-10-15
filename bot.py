@@ -1,4 +1,24 @@
 import os
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
+
+# --- NATYCHMIASTOWY SERWER HTTP DLA RAILWAY (USUWA PROBLEM "DEPLOYING") ---
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"OK")
+    def log_message(self, format, *args):
+        pass
+
+def run_http_server():
+    port = int(os.environ.get("PORT", 8080))
+    server = HTTPServer(("0.0.0.0", port), HealthCheckHandler)
+    server.serve_forever()
+
+threading.Thread(target=run_http_server, daemon=True).start()
+# -------------------------------------------------------------------------
+
 import discord
 from discord.ext import commands, tasks
 
@@ -81,4 +101,53 @@ class TicketSelect(discord.ui.Select):
         for r_id in allowed_role_ids:
             role = guild.get_role(r_id)
             if role:
-                overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=
+                overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True)
+
+        channel_name = f"{emoji}-ticket-{ticket_type}-{interaction.user.name}".lower()
+        ticket_channel = await guild.create_text_channel(channel_name, category=category, overwrites=overwrites)
+
+        role_pings = " ".join([f"<@&{r_id}>" for r_id in allowed_role_ids])
+
+        embed = discord.Embed(
+            title=f"Ticket: {ticket_type.upper()}",
+            description=f"Witaj <@!{interaction.user.id}>!\nAdministracja wkrótce odpowie na Twoje zgłoszenie.\n\nAby zamknąć ten kanał, kliknij przycisk poniżej.",
+            color=0x2b2d31
+        )
+        embed.set_image(url=IMG_URL)
+        await ticket_channel.send(content=f"{role_pings} <@!{interaction.user.id}>", embeds=[embed], view=CloseTicketView())
+        await interaction.response.send_message(f"Utworzono Twój ticket: {ticket_channel.mention}", ephemeral=True)
+
+class TicketView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(TicketSelect())
+
+class VerifyView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Verify", style=discord.ButtonStyle.success, emoji="✅", custom_id="verify_btn_new")
+    async def verify_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        role = interaction.guild.get_role(ACCEPT_ROLE_ID)
+        if not role:
+            return await interaction.response.send_message("Nie znaleziono roli weryfikacji.", ephemeral=True)
+        
+        if role in interaction.user.roles:
+            await interaction.response.send_message("Jesteś już zweryfikowany!", ephemeral=True)
+        else:
+            await interaction.user.add_roles(role)
+            await interaction.response.send_message("Pomyślnie zweryfikowano!", ephemeral=True)
+
+@tasks.loop(hours=24)
+async def minigame_daily_reminder():
+    if MINIGAME_CHANNEL_ID == 0:
+        return
+    channel = bot.get_channel(MINIGAME_CHANNEL_ID)
+    if channel:
+        embed = discord.Embed(
+            title="Daily reminder 🦦",
+            description="Use /minigame to win an award! Booster gets something more!",
+            color=0x2b2d31
+        )
+        embed.set_image(url=IMG_URL)
+        await channel
