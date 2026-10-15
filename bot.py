@@ -4,7 +4,7 @@ import os
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
-# --- Serwer HTTP w tle utrzymujący status Online na Railway ---
+# --- Serwer HTTP w tle (utrzymuje status Online na Railway) ---
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -32,8 +32,8 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 WELCOME_CHANNEL_ID = 1556280506516115466
 BOOST_CHANNEL_ID = 1540358387219304592
 IMG_URL = "https://cdn.discordapp.com/attachments/1548988126452781137/1559839172653490246/coldcfg.gif"
-
 WINNER_ROLE_ID = 1556565240832073779
+ACCEPT_ROLES = [1540360249775493230]
 
 TICKET_CATEGORIES = {
     "shop": 1556300130892906506,
@@ -58,8 +58,6 @@ TICKET_ROLES = {
     "recruitment": [1540359821323149392, 1540495893399081061, 1556062543963750400, 1540359905175801946],
     "partner": [1540359821323149392, 1540495893399081061]
 }
-
-ACCEPT_ROLES = [1540360249775493230]
 
 
 class CloseTicketView(discord.ui.View):
@@ -209,4 +207,34 @@ async def on_member_update(before: discord.Member, after: discord.Member):
         embed.set_thumbnail(url=after.display_avatar.url)
         embed.set_image(url=IMG_URL)
         embed.set_footer(text=after.guild.name)
-        await channel.send(
+        await channel.send(embed=embed)
+
+
+@bot.tree.command(name="say", description="Send message as embed")
+async def say(interaction: discord.Interaction, message: str):
+    embed = discord.Embed(description=message, color=0x2b2d31)
+    embed.set_footer(text=f"Bot • Ad made by {interaction.user.name}")
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.tree.command(name="bandc", description="Ban user permanently")
+@discord.app_commands.checks.has_permissions(ban_members=True)
+async def bandc(interaction: discord.Interaction, target: discord.User, reason: str):
+    await interaction.guild.ban(target, reason=reason)
+    embed = discord.Embed(title="🔨 User has been banned for life", color=0xff0000)
+    embed.add_field(name="👤 User", value=f"<@!{target.id}>", inline=True)
+    embed.add_field(name="🆔 ID", value=f"`{target.id}`", inline=True)
+    embed.add_field(name="🛡️ Administrator", value=f"<@!{interaction.user.id}>", inline=False)
+    embed.add_field(name="📝 Reason", value=reason, inline=False)
+    embed.set_image(url=IMG_URL)
+    embed.set_footer(text=f"{interaction.guild.name} Security")
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.tree.command(name="unbandc", description="Unban user from server")
+@discord.app_commands.checks.has_permissions(ban_members=True)
+async def unbandc(interaction: discord.Interaction, userid: str, reason: str = "Brak powodu"):
+    user = await bot.fetch_user(int(userid))
+    await interaction.guild.unban(user, reason=reason)
+    embed = discord.Embed(title="User has been unbanned", color=0x00ff00)
+    embed.add_field(name="User", value=f"<@!{userid}>", inline=True)
