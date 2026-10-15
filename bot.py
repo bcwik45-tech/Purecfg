@@ -1,15 +1,13 @@
-import discord
-from discord.ext import commands, tasks
 import os
-from http.server import HTTPServer, BaseHTTPRequestHandler
 import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
-# --- PROSTY SERWER HTTP DLA RAILWAY ---
+# --- NATYCHMIASTOWY SERWER HTTP DLA RAILWAY ---
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"Bot is running!")
+        self.wfile.write(b"OK")
     def log_message(self, format, *args):
         pass
 
@@ -18,9 +16,12 @@ def run_http_server():
     server = HTTPServer(("0.0.0.0", port), HealthCheckHandler)
     server.serve_forever()
 
-# Uruchomienie serwera w tle, żeby Railway widział działający port
+# Uruchamiamy port w pierwszej kolejności, żeby Railway od razu widział ruch
 threading.Thread(target=run_http_server, daemon=True).start()
-# --------------------------------------
+# ----------------------------------------------
+
+import discord
+from discord.ext import commands, tasks
 
 intents = discord.Intents.default()
 intents.guilds = True
@@ -32,7 +33,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 WELCOME_CHANNEL_ID = 1556280506516115466
 BOOST_CHANNEL_ID = 1540358387219304592
-MINIGAME_CHANNEL_ID = 0  # <--- Wpisz tutaj ID kanału dla minigry
+MINIGAME_CHANNEL_ID = 0  # <--- Wpisz tutaj ID kanału dla przypomnień o minigrze
 IMG_URL = "https://cdn.discordapp.com/attachments/1548988126452781137/1559839172653490246/coldcfg.gif"
 WINNER_ROLE_ID = 1556565240832073779
 ACCEPT_ROLE_ID = 1560349104893206568
@@ -113,4 +114,64 @@ class TicketSelect(discord.ui.Select):
         embed = discord.Embed(
             title=f"Ticket: {ticket_type.upper()}",
             description=f"Witaj <@!{interaction.user.id}>!\nAdministracja wkrótce odpowie na Twoje zgłoszenie.\n\nAby zamknąć ten kanał, kliknij przycisk poniżej.",
-            color=0x2b2d
+            color=0x2b2d31
+        )
+        await ticket_channel.send(content=f"{role_pings} <@!{interaction.user.id}>", embeds=[embed], view=CloseTicketView())
+        await interaction.response.send_message(f"Utworzono Twój ticket: {ticket_channel.mention}", ephemeral=True)
+
+
+class TicketView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(TicketSelect())
+
+
+class VerifyView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Verify", style=discord.ButtonStyle.success, emoji="✅", custom_id="verify_btn_new")
+    async def verify_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        role = interaction.guild.get_role(ACCEPT_ROLE_ID)
+        if not role:
+            return await interaction.response.send_message("Nie znaleziono roli weryfikacji.", ephemeral=True)
+        
+        if role in interaction.user.roles:
+            await interaction.response.send_message("Jesteś już zweryfikowany!", ephemeral=True)
+        else:
+            await interaction.user.add_roles(role)
+            await interaction.response.send_message("Pomyślnie zweryfikowano!", ephemeral=True)
+
+
+@tasks.loop(hours=24)
+async def minigame_daily_reminder():
+    if MINIGAME_CHANNEL_ID == 0:
+        return
+    channel = bot.get_channel(MINIGAME_CHANNEL_ID)
+    if channel:
+        embed = discord.Embed(
+            title="Daily reminder 🦦",
+            description="Use /minigame to win an award! Booster gets something more!",
+            color=0x2b2d31
+        )
+        await channel.send(embed=embed)
+
+
+@bot.event
+async def on_ready():
+    print(f"Zalogowano jako {bot.user}!")
+    bot.add_view(VerifyView())
+    bot.add_view(TicketView())
+    bot.add_view(CloseTicketView())
+    if not minigame_daily_reminder.is_running():
+        minigame_daily_reminder.start()
+    try:
+        synced = await bot.tree.sync()
+        print(f"Zsynchronizowano {len(synced)} komend slash.")
+    except Exception as e:
+        print(e)
+
+
+@bot.event
+async def on_member_join(member: discord.Member):
+    channel = member.guild.get_channel
