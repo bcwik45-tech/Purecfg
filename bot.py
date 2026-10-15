@@ -1,25 +1,6 @@
 import discord
 from discord.ext import commands
 import os
-import asyncio
-from aiohttp import web
-
-# --- Pętla i asynchroniczny serwer HTTP dla Railway ---
-async def handle_healthcheck(request):
-    return web.Response(text="OK", status=200)
-
-async def start_web_server():
-    app = web.Application()
-    app.router.add_get("/", handle_healthcheck)
-    app.router.add_get("/health", handle_healthcheck)
-    
-    runner = web.AppRunner(app)
-    await runner.setup()
-    
-    port = int(os.environ.get("PORT", 8080))
-    site = web.TCPSite(runner, "0.0.0.0", port)
-    await site.start()
-    print(f"Serwer Healthcheck HTTP uruchomiony na porcie {port}")
 
 intents = discord.Intents.default()
 intents.guilds = True
@@ -62,4 +43,182 @@ TICKET_ROLES = {
 
 class CloseTicketView(discord.ui.View):
     def __init__(self):
-        super().__init__(timeout=
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Zamknij ticket 🔒", style=discord.ButtonStyle.danger, custom_id="close_ticket_btn")
+    async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("Zamykanie i usuwanie ticketu...", ephemeral=True)
+        try:
+            await interaction.channel.delete()
+        except Exception as e:
+            print(f"Błąd przy zamykaniu ticketu: {e}")
+
+
+class TicketSelect(discord.ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(label="Owner", description="Ticket with a matter for the config owners", emoji="👑", value="owner"),
+            discord.SelectOption(label="Shop", description="Ticket for purchase an item from our store", emoji="🛒", value="shop"),
+            discord.SelectOption(label="Support", description="Support ticket for help in our config server", emoji="❓", value="support"),
+            discord.SelectOption(label="Recruitment", description="Application or recruitment matters", emoji="📄", value="recruitment"),
+            discord.SelectOption(label="Partner", description="Ticket for partnership", emoji="🤝", value="partner")
+        ]
+        super().__init__(placeholder="Select category...", min_values=1, max_values=1, options=options, custom_id="persistent_ticket_select")
+
+    async def callback(self, interaction: discord.Interaction):
+        ticket_type = self.values[0]
+        guild = interaction.guild
+        category_id = TICKET_CATEGORIES.get(ticket_type)
+        category = guild.get_channel(category_id) if category_id else None
+        allowed_role_ids = TICKET_ROLES.get(ticket_type, [])
+        emoji = TICKET_EMOJIS.get(ticket_type, "🎫")
+
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True),
+            guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, manage_channels=True)
+        }
+
+        for r_id in allowed_role_ids:
+            role = guild.get_role(r_id)
+            if role:
+                overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True)
+
+        channel_name = f"{emoji}-ticket-{ticket_type}-{interaction.user.name}".lower()
+        ticket_channel = await guild.create_text_channel(channel_name, category=category, overwrites=overwrites)
+
+        role_pings = " ".join([f"<@&{r_id}>" for r_id in allowed_role_ids])
+
+        embed = discord.Embed(
+            title=f"Ticket: {ticket_type.upper()}",
+            description=f"Witaj <@!{interaction.user.id}>!\nAdministracja wkrótce odpowie na Twoje zgłoszenie.\n\nAby zamknąć ten kanał, kliknij przycisk poniżej.",
+            color=0x2b2d31
+        )
+        await ticket_channel.send(content=f"{role_pings} <@!{interaction.user.id}>", embeds=[embed], view=CloseTicketView())
+        await interaction.response.send_message(f"Utworzono Twój ticket: {ticket_channel.mention}", ephemeral=True)
+
+
+class TicketView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(TicketSelect())
+
+
+class VerifyView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Verify", style=discord.ButtonStyle.success, emoji="✅", custom_id="verify_btn_new")
+    async def verify_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        role_id = ACCEPT_ROLES[0]
+        role = interaction.guild.get_role(role_id)
+        if not role:
+            return await interaction.response.send_message("Nie znaleziono roli weryfikacji.", ephemeral=True)
+        
+        if role in interaction.user.roles:
+            await interaction.response.send_message("Jesteś już zweryfikowany!", ephemeral=True)
+        else:
+            await interaction.user.add_roles(role)
+            await interaction.response.send_message("Pomyślnie zweryfikowano!", ephemeral=True)
+
+
+@bot.event
+async def on_ready():
+    print(f"Zalogowano jako {bot.user}!")
+    bot.add_view(VerifyView())
+    bot.add_view(TicketView())
+    bot.add_view(CloseTicketView())
+    try:
+        synced = await bot.tree.sync()
+        print(f"Zsynchronizowano {len(synced)} komend slash.")
+    except Exception as e:
+        print(e)
+
+
+@bot.event
+async def on_member_join(member: discord.Member):
+    channel = member.guild.get_channel(WELCOME_CHANNEL_ID)
+    if not channel:
+        return
+
+    created_str = member.created_at.strftime("%d.%m.%Y %H:%M:%S")
+    joined_str = member.joined_at.strftime("%d.%m.%Y %H:%M:%S") if member.joined_at else "N/A"
+
+    desc = (
+        f"🎉 Hi\n"
+        f"<@!{member.id}>\n"
+        f"Welcome to the best cfg in Poland!\n"
+        f"Go check out our stuff!\n\n"
+        f"**You're our {member.guild.member_count} member!**\n\n"
+        f"**Member Info:**\n"
+        f"🪪 **Discord account created:**\n"
+        f"`{created_str}`\n"
+        f"👤 **Username:** `{member.name}`\n"
+        f"📅 **Joined at:** `{joined_str}`"
+    )
+
+    embed = discord.Embed(title="New member!", description=desc, color=0x2b2d31)
+    embed.set_thumbnail(url=member.display_avatar.url)
+    await channel.send(embed=embed)
+
+
+@bot.event
+async def on_member_update(before: discord.Member, after: discord.Member):
+    if before.premium_since is None and after.premium_since is not None:
+        channel = after.guild.get_channel(BOOST_CHANNEL_ID)
+        if not channel:
+            return
+
+        embed = discord.Embed(
+            title="💎 New server Boost!",
+            description=(
+                f"<@!{after.id}> BOOST!\n"
+                f"> thanks for boosting our server!\n"
+                f"> Go check out our booster zone!\n\n"
+                f"**Boost Info:**\n"
+                f"🧊 **Server Boost level:** `{after.guild.premium_tier}`\n"
+                f"🔢 **Boost count:** `{after.guild.premium_subscription_count}`"
+            ),
+            color=0xff73fa
+        )
+        embed.set_thumbnail(url=after.display_avatar.url)
+        embed.set_image(url=IMG_URL)
+        embed.set_footer(text=after.guild.name)
+        await channel.send(embed=embed)
+
+
+@bot.tree.command(name="say", description="Send message as embed")
+async def say(interaction: discord.Interaction, message: str):
+    embed = discord.Embed(description=message, color=0x2b2d31)
+    embed.set_footer(text=f"Bot • Ad made by {interaction.user.name}")
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.tree.command(name="bandc", description="Ban user permanently")
+@discord.app_commands.checks.has_permissions(ban_members=True)
+async def bandc(interaction: discord.Interaction, target: discord.User, reason: str):
+    await interaction.guild.ban(target, reason=reason)
+    embed = discord.Embed(title="🔨 User has been banned for life", color=0xff0000)
+    embed.add_field(name="👤 User", value=f"<@!{target.id}>", inline=True)
+    embed.add_field(name="🆔 ID", value=f"`{target.id}`", inline=True)
+    embed.add_field(name="🛡️ Administrator", value=f"<@!{interaction.user.id}>", inline=False)
+    embed.add_field(name="📝 Reason", value=reason, inline=False)
+    embed.set_image(url=IMG_URL)
+    embed.set_footer(text=f"{interaction.guild.name} Security")
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.tree.command(name="unbandc", description="Unban user from server")
+@discord.app_commands.checks.has_permissions(ban_members=True)
+async def unbandc(interaction: discord.Interaction, userid: str, reason: str = "Brak powodu"):
+    user = await bot.fetch_user(int(userid))
+    await interaction.guild.unban(user, reason=reason)
+    embed = discord.Embed(title="User has been unbanned", color=0x00ff00)
+    embed.add_field(name="User", value=f"<@!{userid}>", inline=True)
+    embed.set_image(url=IMG_URL)
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.tree.command(name="minigame", description="Try your luck in Cold Cfg minigame")
+@discord.app_commands.checks.cooldown(1, 86400)
+async def min
