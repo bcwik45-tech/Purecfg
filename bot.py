@@ -60,3 +60,25 @@ class TicketSelect(discord.ui.Select):
             discord.SelectOption(label="Shop", description="Ticket for purchase an item from our store", emoji="🛒", value="shop"),
             discord.SelectOption(label="Support", description="Support ticket for help in our config server", emoji="❓", value="support"),
             discord.SelectOption(label="Recruitment", description="Application or recruitment matters", emoji="📄", value="recruitment"),
+            discord.SelectOption(label="Partner", description="Ticket for partnership", emoji="🤝", value="partner")
+        ]
+        super().__init__(placeholder="Select category...", min_values=1, max_values=1, options=options, custom_id="persistent_ticket_select")
+
+    async def callback(self, interaction: discord.Interaction):
+        ticket_type = self.values[0]
+        guild = interaction.guild
+        category_id = TICKET_CATEGORIES.get(ticket_type)
+        category = guild.get_channel(category_id) if category_id else None
+        allowed_role_ids = TICKET_ROLES.get(ticket_type, [])
+        emoji = TICKET_EMOJIS.get(ticket_type, "🎫")
+
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True),
+            guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, manage_channels=True)
+        }
+
+        for r_id in allowed_role_ids:
+            role = guild.get_role(r_id)
+            if role:
+                overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=
