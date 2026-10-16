@@ -151,7 +151,7 @@ async def minigame_daily_reminder():
             description="Use /minigame to win an award! Booster gets something more!",
             color=0x2b2d31
         )
-        embed.set_image(url=IMG_URL)
+        # Bez gifa w przypomnieniu
         await channel.send(content=f"<@&{ACCEPT_ROLE_ID}>", embed=embed)
 
 @bot.event
