@@ -1,6 +1,7 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
+import os
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -57,7 +58,7 @@ class VerifyView(discord.ui.View):
             await inter.response.send_message("Jesteś już zweryfikowany!", ephemeral=True)
         else:
             await inter.user.add_roles(role)
-            await inter.response.send_message("Pomyślnie przesziasłeś weryfikację w **Spidermafia**!", ephemeral=True)
+            await inter.response.send_message("Pomyślnie przeszedłeś weryfikację w **Spidermafia**!", ephemeral=True)
 
 @bot.event
 async def on_member_join(member: discord.Member):
@@ -258,119 +259,4 @@ async def spoofer(inter: discord.Interaction):
 
 
 # --- 7. SKLEP: /vpn ---
-class VPNSelect(discord.ui.Select):
-    def __init__(self):
-        options = [
-            discord.SelectOption(label="IPVANISH", description="Year — 10 PLN", emoji=discord.PartialEmoji.from_str("<:ipvanish:1561774215039025273>"))
-        ]
-        super().__init__(placeholder="❌ × Wybierz wariant...", min_values=1, max_values=1, options=options)
-
-    async def callback(self, inter: discord.Interaction):
-        val = self.values[0]
-        if val == "IPVANISH":
-            desc = "``` IPVANISH ```\n\n│ ***PRICE LIST*** 💸\n\n│ • 📅 **Year** » `10 PLN` 💸"
-            embed = discord.Embed(description=desc, color=discord.Color.from_rgb(0, 180, 0))
-            embed.set_image(url=VPN_BANNER)
-            await inter.response.send_message(embed=embed, ephemeral=True)
-
-class VPNView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-        self.add_item(VPNSelect())
-
-@bot.tree.command(name="vpn", description="Panel i cennik produktów VPN")
-@app_commands.checks.has_permissions(administrator=True)
-async def vpn(inter: discord.Interaction):
-    desc = "``` 🛒 SPIDERMAFIA PRODUCTS × VPN PRODUCTS ```\n\n**Products available from us:**\n• <:ipvanish:1561774215039025273> **IPVANISH**"
-    embed = discord.Embed(description=desc, color=discord.Color.dark_embed())
-    embed.set_image(url=PRICE_LIST_BANNER)
-    await inter.response.send_message(embed=embed, view=VPNView())
-
-
-# --- 8. SKLEP: /bundle ---
-class BundleSelect(discord.ui.Select):
-    def __init__(self):
-        options = [
-            discord.SelectOption(label="STEAM", description="See price", emoji=discord.PartialEmoji.from_str("<:steam:1561775794626240563>")),
-            discord.SelectOption(label="DISCORD", description="See price", emoji=discord.PartialEmoji.from_str("<:discord:1561776241780981810>")),
-            discord.SelectOption(label="FIVEM READY", description="See price", emoji=discord.PartialEmoji.from_str("<:fivemready:1561778286516764682>"))
-        ]
-        super().__init__(placeholder="❌ × Wybierz ofertę z listy", min_values=1, max_values=1, options=options)
-
-    async def callback(self, inter: discord.Interaction):
-        val = self.values[0]
-        if val == "STEAM":
-            desc = "``` STE$M ```\n\n│ ***Ceny:*** 💸\n│ • <:steam:1561775794626240563> **x1** » `0.40 PLN` 💸\n\n│ ***Krótki Opis:***\n│ 🟢 » Full Access\n│ 🟢 » Gotowy do użycia\n│ 🟢 » Nie ma banów"
-            embed = discord.Embed(description=desc, color=discord.Color.from_rgb(180, 0, 0))
-            embed.set_image(url=STEAM_BANNER)
-            await inter.response.send_message(embed=embed, ephemeral=True)
-        elif val == "DISCORD":
-            desc = "``` DISC$RD ```\n\n│ ***Ceny:*** 💸\n│ • <:discord:1561776241780981810> **Email + Phone Verified** » `1.00 PLN` 💸\n│ • <:discord:1561776241780981810> **Token Email + Phone Verified** » `0.70 PLN` 💸\n\n│ ***Krótki Opis:***\n│ 🟢 » Full Access\n│ 🟢 » Gotowy do użycia\n│ 🟢 » Nie ma banów"
-            embed = discord.Embed(description=desc, color=discord.Color.from_rgb(180, 0, 0))
-            embed.set_image(url=DISCORD_BANNER)
-            await inter.response.send_message(embed=embed, ephemeral=True)
-        elif val == "FIVEM READY":
-            desc = "``` FIVEM READY ```\n\n│ ***Ceny:*** 💸\n│ • <:fivemready:1561778286516764682> **x1** » `0.70 PLN` 💸\n│ • <:fivemready:1561778286516764682> **x6** » `3.00 PLN` 💸\n\n│ ***Krótki Opis:***\n│ 🟢 » Full Access\n│ 🟢 » Gotowy do użycia\n│ 🟢 » Nie ma banów\n│ 🟢 » 100% Fresh"
-            embed = discord.Embed(description=desc, color=discord.Color.from_rgb(180, 0, 0))
-            await inter.response.send_message(embed=embed, ephemeral=True)
-
-class BundleView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-        self.add_item(BundleSelect())
-
-@bot.tree.command(name="bundle", description="Lista i cennik kont oraz bundle")
-@app_commands.checks.has_permissions(administrator=True)
-async def bundle(inter: discord.Interaction):
-    desc = "``` 🛒 SPIDERMAFIA PRODUCTS × ACCOUNTS PRODUCTS ```\n\n**Products available from us:**\n• <:steam:1561775794626240563> **STEAM**\n• <:discord:1561776241780981810> **DISCORD**\n• <:fivemready:1561778286516764682> **FIVEM READY**"
-    embed = discord.Embed(description=desc, color=discord.Color.dark_embed())
-    embed.set_image(url=BUNDLE_MAIN_BANNER)
-    await inter.response.send_message(embed=embed, view=BundleView())
-
-
-# --- 9. SKLEP: /counterstrike ---
-class CounterStrikeSelect(discord.ui.Select):
-    def __init__(self):
-        options = [
-            discord.SelectOption(label="Memesense", description="See price", emoji=discord.PartialEmoji.from_str("<:memesense:1561768601948520639>")),
-            discord.SelectOption(label="Prime Ready", description="See price", emoji=discord.PartialEmoji.from_str("<:cs_ready:1561784269846876363>")),
-            discord.SelectOption(label="Premier Ready (4+ Medals)", description="See price", emoji=discord.PartialEmoji.from_str("<:cs_ready:1561784269846876363>"))
-        ]
-        super().__init__(placeholder="❌ × Wybierz ofertę z listy", min_values=1, max_values=1, options=options)
-
-    async def callback(self, inter: discord.Interaction):
-        val = self.values[0]
-        if val == "Memesense":
-            desc = "``` MEMESENSE ```\n\n│ ***PRICE LIST*** 💸\n\n│ • 📅 **14 Days** » `18 PLN` 💸\n│ • 📅 **31 Days** » `25 PLN` 💸\n│ • 📅 **90 Days** » `53 PLN` 💸\n│ • 📅 **180 Days** » `88 PLN` 💸"
-            embed = discord.Embed(description=desc, color=discord.Color.from_rgb(180, 0, 0))
-            embed.set_image(url=MEMESENSE_BANNER)
-            await inter.response.send_message(embed=embed, ephemeral=True)
-        elif val == "Prime Ready":
-            desc = "``` PRIME READY ```\n\n│ ***PRICE LIST*** 💸\n\n│ • <:cs_ready:1561784269846876363> **Prime Ready** » `8 PLN` 💸\n\n│ ***Krótki Opis:***\n│ 🟢 » Full Access\n│ 🟢 » Gotowy do użycia\n│ 🟢 » Status Prime"
-            embed = discord.Embed(description=desc, color=discord.Color.from_rgb(180, 0, 0))
-            await inter.response.send_message(embed=embed, ephemeral=True)
-        elif val == "Premier Ready (4+ Medals)":
-            desc = "``` PREMIER READY (4+ MEDALS) ```\n\n│ ***PRICE LIST*** 💸\n\n│ • <:cs_ready:1561784269846876363> **Premier Ready** » `10 PLN` 💸\n\n│ ***Krótki Opis:***\n│ 🟢 » Full Access\n│ 🟢 » 4+ Medals\n│ 🟢 » Gotowy do Premier"
-            embed = discord.Embed(description=desc, color=discord.Color.from_rgb(180, 0, 0))
-            await inter.response.send_message(embed=embed, ephemeral=True)
-
-class CounterStrikeView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-        self.add_item(CounterStrikeSelect())
-
-@bot.tree.command(name="counterstrike", description="Lista i cennik produktów Counter-Strike")
-@app_commands.checks.has_permissions(administrator=True)
-async def counterstrike(inter: discord.Interaction):
-    desc = "``` 🛒 SPIDERMAFIA PRODUCTS × CS2 PRODUCTS ```\n\n**Products available from us:**\n• <:memesense:1561768601948520639> **Memesense**\n• <:cs_ready:1561784269846876363> **Prime Ready**\n• <:cs_ready:1561784269846876363> **Premier Ready (4+ Medals)**"
-    embed = discord.Embed(description=desc, color=discord.Color.dark_embed())
-    embed.set_image(url=CS_MAIN_BANNER)
-    await inter.response.send_message(embed=embed, view=CounterStrikeView())
-
-
-@bot.event
-async def on_ready():
-    await bot.tree.sync()
-    print(f"Bot {bot.user} jest gotowy i w pełni zsynchronizowany pod marką Spidermafia!")
-
-# bot.run("TWÓJ_TOKEN_BOTA")
+class VPNSelect
