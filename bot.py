@@ -259,4 +259,22 @@ async def spoofer(inter: discord.Interaction):
 
 
 # --- 7. SKLEP: /vpn ---
-class VPNSelect
+class VPNSelect(discord.ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(label="IPVANISH", description="Year — 10 PLN", emoji=discord.PartialEmoji.from_str("<:ipvanish:1561774215039025273>"))
+        ]
+        super().__init__(placeholder="❌ × Wybierz wariant...", min_values=1, max_values=1, options=options)
+
+    async def callback(self, inter: discord.Interaction):
+        val = self.values[0]
+        if val == "IPVANISH":
+            desc = "``` IPVANISH ```\n\n│ ***PRICE LIST*** 💸\n\n│ • 📅 **Year** » `10 PLN` 💸"
+            embed = discord.Embed(description=desc, color=discord.Color.from_rgb(0, 180, 0))
+            embed.set_image(url=VPN_BANNER)
+            await inter.response.send_message(embed=embed, ephemeral=True)
+
+class VPNView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(VPNSelect())
