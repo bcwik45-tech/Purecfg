@@ -1,142 +1,376 @@
-import os
-import threading
-from datetime import time, timezone, timedelta
-from http.server import HTTPServer, BaseHTTPRequestHandler
-
-# --- NATYCHMIASTOWY SERWER HTTP DLA RAILWAY ---
-class HealthCheckHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"OK")
-    def log_message(self, format, *args):
-        pass
-
-def run_http_server():
-    port = int(os.environ.get("PORT", 8080))
-    server = HTTPServer(("0.0.0.0", port), HealthCheckHandler)
-    server.serve_forever()
-
-threading.Thread(target=run_http_server, daemon=True).start()
-# ---------------------------------------------
-
 import discord
-from discord.ext import commands, tasks
+from discord import app_commands
+from discord.ext import commands
 
 intents = discord.Intents.default()
-intents.guilds = True
-intents.members = True
-intents.bans = True
 intents.message_content = True
-
+intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-WELCOME_CHANNEL_ID = 1556280506516115466
-BOOST_CHANNEL_ID = 1540358387219304592
-MINIGAME_CHANNEL_ID = 1556566161653764157
-IMG_URL = "https://cdn.discordapp.com/attachments/1548988126452781137/1560367951020953651/coldcfg2.gif"
-WINNER_ROLE_ID = 1556565240832073779
-ACCEPT_ROLE_ID = 1540360249775493230
+# --- ID RÓL I KANAŁÓW ---
+VERIFY_ROLE_ID = 1540360249775493230
+WELCOME_CH = 1556280506516115466
+GLOBAL_INFO_CH = 1540356981238530098
+REVIEWS_CH = 1561742557019373618
 
+# Kategorie ticketów
 TICKET_CATEGORIES = {
-    "shop": 1556300130892906506,
     "owner": 1556300080355606608,
+    "shop": 1556300130892906506,
     "support": 1556300180624769105,
     "recruitment": 1556300236526329936,
-    "partner": 1556383124424892606
+    "partnership": 1556383124424892606
 }
 
-TICKET_EMOJIS = {
-    "shop": "🛒",
-    "owner": "👑",
-    "support": "❓",
-    "recruitment": "📄",
-    "partner": "🤝"
-}
-
+# Dostęp ról do ticketów
 TICKET_ROLES = {
-    "shop": [1540359821323149392],
-    "owner": [1540359821323149392, 1540495893399081061],
-    "support": [1540359821323149392, 1540495893399081061, 1556062543963750400, 1540359905175801946, 1540360086617063584],
-    "recruitment": [1540359821323149392, 1540495893399081061, 1556062543963750400, 1540359905175801946],
-    "partner": [1540359821323149392, 1540495893399081061]
+    "owner": 1540359821323149392,
+    "shop": 1540359821323149392,
+    "support": 1561785358683996351,
+    "recruitment": 1561785358683996351,
+    "partnership": 1540359821323149392
 }
 
+# --- BANERY ---
+PRICE_LIST_BANNER = "https://cdn.discordapp.com/attachments/1556342431903911966/1561450000000000001/Cennik_SpiderMafia.png"
+SUSANO_BANNER = "https://cdn.discordapp.com/attachments/1556342431903911966/1561450000000000002/Mroczny_baner_FIVEM_SUSANO.png"
+AMBANI_BANNER = "https://cdn.discordapp.com/attachments/1556342431903911966/1561450000000000003/fivem_ambani.png"
+KEYSER_BANNER = "https://cdn.discordapp.com/attachments/1556342431903911966/1561450000000000004/Czerwony_neonowy_baner_FiveM_Keyser.png"
+REDENGINE_BANNER = "https://cdn.discordapp.com/attachments/1556342431903911966/1561450000000000005/Redengine.jpg"
+VPN_BANNER = "https://cdn.discordapp.com/attachments/1556342431903911966/1561450000000000006/ipvvanish_banner.png"
+BUNDLE_MAIN_BANNER = "https://cdn.discordapp.com/attachments/1556342431903911966/1561450000000000007/bundle_banner.png"
+STEAM_BANNER = "https://cdn.discordapp.com/attachments/1556342431903911966/1561450000000000008/steam_banner.png"
+DISCORD_BANNER = "https://cdn.discordapp.com/attachments/1556342431903911966/1561450000000000009/discord_banner.png"
+CS_MAIN_BANNER = "https://cdn.discordapp.com/attachments/1556342431903911966/1561450000000000010/cs2_spidermafia.jpg"
+MEMESENSE_BANNER = "https://cdn.discordapp.com/attachments/1556342431903911966/1561450000000000011/memesense_banner.png"
+
+
+# --- 1. WERYFIKACJA I POWITANIA ---
+class VerifyView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Zweryfikuj się", style=discord.ButtonStyle.green, emoji="✅", custom_id="verify_button")
+    async def verify_callback(self, inter: discord.Interaction, button: discord.ui.Button):
+        role = inter.guild.get_role(VERIFY_ROLE_ID)
+        if role in inter.user.roles:
+            await inter.response.send_message("Jesteś już zweryfikowany!", ephemeral=True)
+        else:
+            await inter.user.add_roles(role)
+            await inter.response.send_message("Pomyślnie przesziasłeś weryfikację w **Spidermafia**!", ephemeral=True)
+
+@bot.event
+async def on_member_join(member: discord.Member):
+    channel = member.guild.get_channel(WELCOME_CH)
+    if channel:
+        embed = discord.Embed(
+            title="Witaj w Spidermafia!",
+            description=f"Witaj {member.mention}! Cieszymy się, że do nas dołączyłeś. Przejdź do kanału weryfikacji, aby uzyskać pełny dostęp do serwera.",
+            color=discord.Color.from_rgb(180, 0, 0)
+        )
+        await channel.send(embed=embed)
+
+@bot.tree.command(name="weryfikacja", description="Wysyła panel weryfikacyjny")
+@app_commands.checks.has_permissions(administrator=True)
+async def weryfikacja(inter: discord.Interaction):
+    embed = discord.Embed(
+        title="Weryfikacja Spidermafia",
+        description="Kliknij przycisk poniżej, aby zweryfikować swoje konto.",
+        color=discord.Color.from_rgb(180, 0, 0)
+    )
+    await inter.channel.send(embed=embed, view=VerifyView())
+    await inter.response.send_message("Wysłano panel weryfikacji.", ephemeral=True)
+
+
+# --- 2. TICKETY ---
 class CloseTicketView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="Zamknij ticket 🔒", style=discord.ButtonStyle.danger, custom_id="close_ticket_btn")
-    async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Zamykanie i usuwanie ticketu...", ephemeral=True)
-        try:
-            await interaction.channel.delete()
-        except Exception as e:
-            print(f"Błąd przy zamykaniu ticketu: {e}")
+    @discord.ui.button(label="Zamknij Ticket", style=discord.ButtonStyle.red, emoji="🔒", custom_id="close_ticket_btn")
+    async def close_callback(self, inter: discord.Interaction, button: discord.ui.Button):
+        await inter.response.send_message("Zamykanie ticketa...", ephemeral=True)
+        await discord.utils.sleep_until(discord.utils.utcnow() + discord.timedelta(seconds=3))
+        await inter.channel.delete()
 
 class TicketSelect(discord.ui.Select):
     def __init__(self):
         options = [
-            discord.SelectOption(label="Owner", description="Ticket with a matter for the config owners", emoji="👑", value="owner"),
-            discord.SelectOption(label="Shop", description="Ticket for purchase an item from our store", emoji="🛒", value="shop"),
-            discord.SelectOption(label="Support", description="Support ticket for help in our config server", emoji="❓", value="support"),
-            discord.SelectOption(label="Recruitment", description="Application or recruitment matters", emoji="📄", value="recruitment"),
-            discord.SelectOption(label="Partner", description="Ticket for partnership", emoji="🤝", value="partner")
+            discord.SelectOption(label="Ticket Owner", description="Open if you have a demand to the owners.", emoji="👑"),
+            discord.SelectOption(label="Ticket Shop", description="Open if you want to buy something.", emoji="🛒"),
+            discord.SelectOption(label="Ticket Support", description="Open if you need any help.", emoji="🎫"),
+            discord.SelectOption(label="Ticket Recruitment", description="Open if you want to join us.", emoji="📋"),
+            discord.SelectOption(label="Ticket Partner", description="Open if you want to collaborate with us.", emoji="🤝")
         ]
-        super().__init__(placeholder="Select category...", min_values=1, max_values=1, options=options, custom_id="persistent_ticket_select")
+        super().__init__(placeholder="Select category...", min_values=1, max_values=1, options=options)
 
-    async def callback(self, interaction: discord.Interaction):
-        ticket_type = self.values[0]
-        guild = interaction.guild
-        category_id = TICKET_CATEGORIES.get(ticket_type)
-        category = guild.get_channel(category_id) if category_id else None
-        allowed_role_ids = TICKET_ROLES.get(ticket_type, [])
-        emoji = TICKET_EMOJIS.get(ticket_type, "🎫")
+    async def callback(self, inter: discord.Interaction):
+        val = self.values[0]
+        guild = inter.guild
+        key = "owner" if "Owner" in val else "shop" if "Shop" in val else "support" if "Support" in val else "recruitment" if "Recruitment" in val else "partnership"
+        
+        category = guild.get_channel(TICKET_CATEGORIES[key])
+        role = guild.get_role(TICKET_ROLES[key])
 
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(view_channel=False),
-            interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True),
-            guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, manage_channels=True)
+            inter.user: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True),
+            role: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True)
         }
 
-        for r_id in allowed_role_ids:
-            role = guild.get_role(r_id)
-            if role:
-                overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True)
-
-        channel_name = f"{emoji}-ticket-{ticket_type}-{interaction.user.name}".lower()
-        ticket_channel = await guild.create_text_channel(channel_name, category=category, overwrites=overwrites)
-
-        role_pings = " ".join([f"<@&{r_id}>" for r_id in allowed_role_ids])
-
+        channel = await guild.create_text_channel(name=f"ticket-{inter.user.name}", category=category, overwrites=overwrites)
         embed = discord.Embed(
-            title=f"Ticket: {ticket_type.upper()}",
-            description=f"Witaj <@!{interaction.user.id}>!\nAdministracja wkrótce odpowie na Twoje zgłoszenie.\n\nAby zamknąć ten kanał, kliknij przycisk poniżej.",
-            color=0x2b2d31
+            title=f"Ticket: {val}",
+            description=f"Witaj {inter.user.mention}! Opisz swoją sprawę, administracja wkrótce odpowie.",
+            color=discord.Color.from_rgb(180, 0, 0)
         )
-        embed.set_image(url=IMG_URL)
-        await ticket_channel.send(content=f"{role_pings} <@!{interaction.user.id}>", embeds=[embed], view=CloseTicketView())
-        await interaction.response.send_message(f"Utworzono Twój ticket: {ticket_channel.mention}", ephemeral=True)
+        await channel.send(content=f"{role.mention} {inter.user.mention}", embed=embed, view=CloseTicketView())
+        await inter.response.send_message(f"Utworzono ticket: {channel.mention}", ephemeral=True)
 
 class TicketView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
         self.add_item(TicketSelect())
 
-class VerifyView(discord.ui.View):
+@bot.tree.command(name="tickets", description="Wysyła panel ticketów")
+@app_commands.checks.has_permissions(administrator=True)
+async def tickets(inter: discord.Interaction):
+    embed = discord.Embed(title="Tickets", description="Wybierz kategorię ticketa z menu poniżej.", color=discord.Color.dark_embed())
+    await inter.channel.send(embed=embed, view=TicketView())
+    await inter.response.send_message("Wysłano panel ticketów.", ephemeral=True)
+
+
+# --- 3. GLOBAL INFO & REVIEWS ---
+@bot.tree.command(name="globalinfo", description="Wyświetla ogólne informacje i regulamin Spidermafia")
+@app_commands.checks.has_permissions(administrator=True)
+async def globalinfo(inter: discord.Interaction):
+    embed = discord.Embed(
+        title="Spidermafia — Global Info",
+        description="**Regulamin (§1-§8)**, **Płatności (BLIK / PSC)** oraz **Partnership** są dostępne na tym kanale.",
+        color=discord.Color.from_rgb(180, 0, 0)
+    )
+    await inter.channel.send(embed=embed)
+    await inter.response.send_message("Wysłano Global Info.", ephemeral=True)
+
+@bot.tree.command(name="reviews", description="Informacje o systemie recenzji")
+@app_commands.checks.has_permissions(administrator=True)
+async def reviews(inter: discord.Interaction):
+    embed = discord.Embed(
+        title="Spidermafia — Reviews",
+        description=f"Sprawdź lub wystaw opinię na kanale <#{REVIEWS_CH}>!",
+        color=discord.Color.from_rgb(180, 0, 0)
+    )
+    await inter.channel.send(embed=embed)
+    await inter.response.send_message("Wysłano panel recenzji.", ephemeral=True)
+
+
+# --- 4. MODERACJA (/bandc, /unbandc) ---
+@bot.tree.command(name="bandc", description="Banuje użytkownika")
+@app_commands.checks.has_permissions(administrator=True)
+async def bandc(inter: discord.Interaction, member: discord.Member, reason: str = "Brak powody"):
+    await member.ban(reason=reason)
+    await inter.response.send_message(f"Zbanowano {member.mention}. Powód: {reason}", ephemeral=True)
+
+@bot.tree.command(name="unbandc", description="Odbanowuje użytkownika po ID")
+@app_commands.checks.has_permissions(administrator=True)
+async def unbandc(inter: discord.Interaction, user_id: str):
+    user = await bot.fetch_user(int(user_id))
+    await inter.guild.unban(user)
+    await inter.response.send_message(f"Odbanowano użytkownika {user.name}.", ephemeral=True)
+
+
+# --- 5. SKLEP: /cheats (FiveM) ---
+class CheatsSelect(discord.ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(label="Susano / Susano Lite", description="See price", emoji=discord.PartialEmoji.from_str("<:susano:1561762163822170243>")),
+            discord.SelectOption(label="Ambani", description="See price", emoji=discord.PartialEmoji.from_str("<:ambani:1561761766856204368>")),
+            discord.SelectOption(label="Keyser Internal / External", description="See price", emoji=discord.PartialEmoji.from_str("<:keyser:1561761530612162650>"))
+        ]
+        super().__init__(placeholder="❌ × Wybierz ofertę z listy", min_values=1, max_values=1, options=options)
+
+    async def callback(self, inter: discord.Interaction):
+        val = self.values[0]
+        if val == "Susano / Susano Lite":
+            desc = "``` SUSANO ```\n\n│ ***PRICE LIST*** 💸\n\n│ • 📅 **Week** » `55 PLN` 💸\n│ • 📅 **Month** » `75 PLN` 💸\n│ • 📅 **3 Months** » `110 PLN` 💸\n│ • 📅 **Lifetime** » `150 PLN` 💸"
+            embed = discord.Embed(description=desc, color=discord.Color.from_rgb(180, 0, 0))
+            embed.set_image(url=SUSANO_BANNER)
+            await inter.response.send_message(embed=embed, ephemeral=True)
+        elif val == "Ambani":
+            desc = "``` AMBANI ```\n\n│ ***PRICE LIST*** 💸\n\n│ • 📅 **Week** » `42 PLN` 💸\n│ • 📅 **Month** » `60 PLN` 💸\n│ • 📅 **Lifetime** » `135 PLN` 💸"
+            embed = discord.Embed(description=desc, color=discord.Color.from_rgb(180, 0, 0))
+            embed.set_image(url=AMBANI_BANNER)
+            await inter.response.send_message(embed=embed, ephemeral=True)
+        elif val == "Keyser Internal / External":
+            desc = "``` KEYSER INTERNAL ```\n\n│ ***PRICE LIST*** 💸\n\n│ • 📅 **1 Day** » `25 PLN` 💸\n│ • 📅 **Week** » `47 PLN` 💸\n│ • 📅 **Month** » `64 PLN` 💸\n│ • 📅 **Lifetime** » `155 PLN` 💸\n\n``` KEYSER EXTERNAL ```\n\n│ ***PRICE LIST*** 💸\n\n│ • 📅 **Month** » `90 PLN` 💸\n│ • 📅 **Lifetime** » `177 PLN` 💸"
+            embed = discord.Embed(description=desc, color=discord.Color.from_rgb(180, 0, 0))
+            embed.set_image(url=KEYSER_BANNER)
+            await inter.response.send_message(embed=embed, ephemeral=True)
+
+class CheatsView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
+        self.add_item(CheatsSelect())
 
-    @discord.ui.button(label="Verify", style=discord.ButtonStyle.success, emoji="✅", custom_id="verify_btn_new")
-    async def verify_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        role = interaction.guild.get_role(ACCEPT_ROLE_ID)
-        if not role:
-            return await interaction.response.send_message("Nie znaleziono roli weryfikacji.", ephemeral=True)
-        
-        if role in interaction.user.roles:
-            await interaction.response.send_message("Jesteś już zweryfikowany!", ephemeral=True)
-        else:
-            await interaction.user.add_roles(role)
-            await interaction.response.send_message("Pomyślnie zweryfikowano!", ephemeral=True)
+@bot.tree.command(name="cheats", description="Lista i cennik produktów FiveM")
+@app_commands.checks.has_permissions(administrator=True)
+async def cheats(inter: discord.Interaction):
+    desc = "``` 🛒 SPIDERMAFIA PRODUCTS × FIVEM PRODUCTS ```\n\n**Cheats available from us:**\n• <:susano:1561762163822170243> **Susano / Susano Lite**\n• <:ambani:1561761766856204368> **Ambani**\n• <:keyser:1561761530612162650> **Keyser Internal / External**"
+    embed = discord.Embed(description=desc, color=discord.Color.dark_embed())
+    embed.set_image(url=PRICE_LIST_BANNER)
+    await inter.response.send_message(embed=embed, view=CheatsView())
 
-POLAND_TZ = timezone(
+
+# --- 6. SKLEP: /spoofer ---
+class SpooferSelect(discord.ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(label="Red Engine", description="See price", emoji=discord.PartialEmoji.from_str("<:redengine:1561770287832244226>")),
+            discord.SelectOption(label="Echo.Fun", description="See price", emoji=discord.PartialEmoji.from_str("<:echo:1561770287832244225>"))
+        ]
+        super().__init__(placeholder="❌ × Wybierz ofertę z listy", min_values=1, max_values=1, options=options)
+
+    async def callback(self, inter: discord.Interaction):
+        val = self.values[0]
+        if val == "Red Engine":
+            desc = "``` RED ENGINE ```\n\n│ ***PRICE LIST*** 💸\n\n│ • 📅 **Week** » `40 PLN` 💸\n│ • 📅 **Month** » `70 PLN` 💸\n│ • 📅 **Lifetime** » `177 PLN` 💸"
+            embed = discord.Embed(description=desc, color=discord.Color.from_rgb(180, 0, 0))
+            embed.set_image(url=REDENGINE_BANNER)
+            await inter.response.send_message(embed=embed, ephemeral=True)
+        elif val == "Echo.Fun":
+            desc = "``` ECHO.FUN ```\n\n│ ***PRICE LIST*** 💸\n\n│ • 📅 **Week** » `21.50 PLN` 💸\n│ • 📅 **Month** » `40 PLN` 💸\n│ • 📅 **Lifetime** » `80 PLN` 💸"
+            embed = discord.Embed(description=desc, color=discord.Color.from_rgb(180, 0, 0))
+            embed.set_image(url=PRICE_LIST_BANNER)
+            await inter.response.send_message(embed=embed, ephemeral=True)
+
+class SpooferView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(SpooferSelect())
+
+@bot.tree.command(name="spoofer", description="Lista i cennik spooferów")
+@app_commands.checks.has_permissions(administrator=True)
+async def spoofer(inter: discord.Interaction):
+    desc = "``` 🛒 SPIDERMAFIA PRODUCTS × SPOOFER PRODUCTS ```\n\n**Products available from us:**\n• <:redengine:1561770287832244226> **Red Engine**\n• <:echo:1561770287832244225> **Echo.Fun**"
+    embed = discord.Embed(description=desc, color=discord.Color.dark_embed())
+    embed.set_image(url=PRICE_LIST_BANNER)
+    await inter.response.send_message(embed=embed, view=SpooferView())
+
+
+# --- 7. SKLEP: /vpn ---
+class VPNSelect(discord.ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(label="IPVANISH", description="Year — 10 PLN", emoji=discord.PartialEmoji.from_str("<:ipvanish:1561774215039025273>"))
+        ]
+        super().__init__(placeholder="❌ × Wybierz wariant...", min_values=1, max_values=1, options=options)
+
+    async def callback(self, inter: discord.Interaction):
+        val = self.values[0]
+        if val == "IPVANISH":
+            desc = "``` IPVANISH ```\n\n│ ***PRICE LIST*** 💸\n\n│ • 📅 **Year** » `10 PLN` 💸"
+            embed = discord.Embed(description=desc, color=discord.Color.from_rgb(0, 180, 0))
+            embed.set_image(url=VPN_BANNER)
+            await inter.response.send_message(embed=embed, ephemeral=True)
+
+class VPNView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(VPNSelect())
+
+@bot.tree.command(name="vpn", description="Panel i cennik produktów VPN")
+@app_commands.checks.has_permissions(administrator=True)
+async def vpn(inter: discord.Interaction):
+    desc = "``` 🛒 SPIDERMAFIA PRODUCTS × VPN PRODUCTS ```\n\n**Products available from us:**\n• <:ipvanish:1561774215039025273> **IPVANISH**"
+    embed = discord.Embed(description=desc, color=discord.Color.dark_embed())
+    embed.set_image(url=PRICE_LIST_BANNER)
+    await inter.response.send_message(embed=embed, view=VPNView())
+
+
+# --- 8. SKLEP: /bundle ---
+class BundleSelect(discord.ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(label="STEAM", description="See price", emoji=discord.PartialEmoji.from_str("<:steam:1561775794626240563>")),
+            discord.SelectOption(label="DISCORD", description="See price", emoji=discord.PartialEmoji.from_str("<:discord:1561776241780981810>")),
+            discord.SelectOption(label="FIVEM READY", description="See price", emoji=discord.PartialEmoji.from_str("<:fivemready:1561778286516764682>"))
+        ]
+        super().__init__(placeholder="❌ × Wybierz ofertę z listy", min_values=1, max_values=1, options=options)
+
+    async def callback(self, inter: discord.Interaction):
+        val = self.values[0]
+        if val == "STEAM":
+            desc = "``` STE$M ```\n\n│ ***Ceny:*** 💸\n│ • <:steam:1561775794626240563> **x1** » `0.40 PLN` 💸\n\n│ ***Krótki Opis:***\n│ 🟢 » Full Access\n│ 🟢 » Gotowy do użycia\n│ 🟢 » Nie ma banów"
+            embed = discord.Embed(description=desc, color=discord.Color.from_rgb(180, 0, 0))
+            embed.set_image(url=STEAM_BANNER)
+            await inter.response.send_message(embed=embed, ephemeral=True)
+        elif val == "DISCORD":
+            desc = "``` DISC$RD ```\n\n│ ***Ceny:*** 💸\n│ • <:discord:1561776241780981810> **Email + Phone Verified** » `1.00 PLN` 💸\n│ • <:discord:1561776241780981810> **Token Email + Phone Verified** » `0.70 PLN` 💸\n\n│ ***Krótki Opis:***\n│ 🟢 » Full Access\n│ 🟢 » Gotowy do użycia\n│ 🟢 » Nie ma banów"
+            embed = discord.Embed(description=desc, color=discord.Color.from_rgb(180, 0, 0))
+            embed.set_image(url=DISCORD_BANNER)
+            await inter.response.send_message(embed=embed, ephemeral=True)
+        elif val == "FIVEM READY":
+            desc = "``` FIVEM READY ```\n\n│ ***Ceny:*** 💸\n│ • <:fivemready:1561778286516764682> **x1** » `0.70 PLN` 💸\n│ • <:fivemready:1561778286516764682> **x6** » `3.00 PLN` 💸\n\n│ ***Krótki Opis:***\n│ 🟢 » Full Access\n│ 🟢 » Gotowy do użycia\n│ 🟢 » Nie ma banów\n│ 🟢 » 100% Fresh"
+            embed = discord.Embed(description=desc, color=discord.Color.from_rgb(180, 0, 0))
+            await inter.response.send_message(embed=embed, ephemeral=True)
+
+class BundleView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(BundleSelect())
+
+@bot.tree.command(name="bundle", description="Lista i cennik kont oraz bundle")
+@app_commands.checks.has_permissions(administrator=True)
+async def bundle(inter: discord.Interaction):
+    desc = "``` 🛒 SPIDERMAFIA PRODUCTS × ACCOUNTS PRODUCTS ```\n\n**Products available from us:**\n• <:steam:1561775794626240563> **STEAM**\n• <:discord:1561776241780981810> **DISCORD**\n• <:fivemready:1561778286516764682> **FIVEM READY**"
+    embed = discord.Embed(description=desc, color=discord.Color.dark_embed())
+    embed.set_image(url=BUNDLE_MAIN_BANNER)
+    await inter.response.send_message(embed=embed, view=BundleView())
+
+
+# --- 9. SKLEP: /counterstrike ---
+class CounterStrikeSelect(discord.ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(label="Memesense", description="See price", emoji=discord.PartialEmoji.from_str("<:memesense:1561768601948520639>")),
+            discord.SelectOption(label="Prime Ready", description="See price", emoji=discord.PartialEmoji.from_str("<:cs_ready:1561784269846876363>")),
+            discord.SelectOption(label="Premier Ready (4+ Medals)", description="See price", emoji=discord.PartialEmoji.from_str("<:cs_ready:1561784269846876363>"))
+        ]
+        super().__init__(placeholder="❌ × Wybierz ofertę z listy", min_values=1, max_values=1, options=options)
+
+    async def callback(self, inter: discord.Interaction):
+        val = self.values[0]
+        if val == "Memesense":
+            desc = "``` MEMESENSE ```\n\n│ ***PRICE LIST*** 💸\n\n│ • 📅 **14 Days** » `18 PLN` 💸\n│ • 📅 **31 Days** » `25 PLN` 💸\n│ • 📅 **90 Days** » `53 PLN` 💸\n│ • 📅 **180 Days** » `88 PLN` 💸"
+            embed = discord.Embed(description=desc, color=discord.Color.from_rgb(180, 0, 0))
+            embed.set_image(url=MEMESENSE_BANNER)
+            await inter.response.send_message(embed=embed, ephemeral=True)
+        elif val == "Prime Ready":
+            desc = "``` PRIME READY ```\n\n│ ***PRICE LIST*** 💸\n\n│ • <:cs_ready:1561784269846876363> **Prime Ready** » `8 PLN` 💸\n\n│ ***Krótki Opis:***\n│ 🟢 » Full Access\n│ 🟢 » Gotowy do użycia\n│ 🟢 » Status Prime"
+            embed = discord.Embed(description=desc, color=discord.Color.from_rgb(180, 0, 0))
+            await inter.response.send_message(embed=embed, ephemeral=True)
+        elif val == "Premier Ready (4+ Medals)":
+            desc = "``` PREMIER READY (4+ MEDALS) ```\n\n│ ***PRICE LIST*** 💸\n\n│ • <:cs_ready:1561784269846876363> **Premier Ready** » `10 PLN` 💸\n\n│ ***Krótki Opis:***\n│ 🟢 » Full Access\n│ 🟢 » 4+ Medals\n│ 🟢 » Gotowy do Premier"
+            embed = discord.Embed(description=desc, color=discord.Color.from_rgb(180, 0, 0))
+            await inter.response.send_message(embed=embed, ephemeral=True)
+
+class CounterStrikeView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(CounterStrikeSelect())
+
+@bot.tree.command(name="counterstrike", description="Lista i cennik produktów Counter-Strike")
+@app_commands.checks.has_permissions(administrator=True)
+async def counterstrike(inter: discord.Interaction):
+    desc = "``` 🛒 SPIDERMAFIA PRODUCTS × CS2 PRODUCTS ```\n\n**Products available from us:**\n• <:memesense:1561768601948520639> **Memesense**\n• <:cs_ready:1561784269846876363> **Prime Ready**\n• <:cs_ready:1561784269846876363> **Premier Ready (4+ Medals)**"
+    embed = discord.Embed(description=desc, color=discord.Color.dark_embed())
+    embed.set_image(url=CS_MAIN_BANNER)
+    await inter.response.send_message(embed=embed, view=CounterStrikeView())
+
+
+@bot.event
+async def on_ready():
+    await bot.tree.sync()
+    print(f"Bot {bot.user} jest gotowy i w pełni zsynchronizowany pod marką Spidermafia!")
+
+# bot.run("TWÓJ_TOKEN_BOTA")
