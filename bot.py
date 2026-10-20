@@ -42,11 +42,13 @@ VPN_BANNER = "https://cdn.discordapp.com/attachments/1556342431903911966/1561450
 BUNDLE_MAIN_BANNER = "https://cdn.discordapp.com/attachments/1556342431903911966/1561450000000000007/bundle_banner.png"
 STEAM_BANNER = "https://cdn.discordapp.com/attachments/1556342431903911966/1561450000000000008/steam_banner.png"
 DISCORD_BANNER = "https://cdn.discordapp.com/attachments/1556342431903911966/1561450000000000009/discord_banner.png"
+FIVEM_READY_BANNER = "https://cdn.discordapp.com/attachments/1556342431903911966/1561450000000000012/fivem_ready_spiderr.png"
+TICKET_BANNER = "https://cdn.discordapp.com/attachments/1556342431903911966/1561450000000000013/ticketspidermafia.png"
 CS_MAIN_BANNER = "https://cdn.discordapp.com/attachments/1556342431903911966/1561450000000000010/cs2_spidermafia.jpg"
 MEMESENSE_BANNER = "https://cdn.discordapp.com/attachments/1556342431903911966/1561450000000000011/memesense_banner.png"
 
 
-# --- 1. WERYFIKACJA I POWITANIA (/setup_weryfikacja) ---
+# --- 1. WERYFIKACJA I POWITANIA (/weryfikacja) ---
 class VerifyView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -71,9 +73,9 @@ async def on_member_join(member: discord.Member):
         )
         await channel.send(embed=embed)
 
-@bot.tree.command(name="setup_weryfikacja", description="Send verification panel")
+@bot.tree.command(name="weryfikacja", description="Wysyła panel weryfikacyjny Spidermafia")
 @app_commands.checks.has_permissions(administrator=True)
-async def setup_weryfikacja(inter: discord.Interaction):
+async def weryfikacja(inter: discord.Interaction):
     embed = discord.Embed(
         title="Weryfikacja Spidermafia",
         description="Kliknij przycisk poniżej, aby zweryfikować swoje konto.",
@@ -83,7 +85,7 @@ async def setup_weryfikacja(inter: discord.Interaction):
     await inter.response.send_message("Wysłano panel weryfikacji.", ephemeral=True)
 
 
-# --- 2. TICKETY (/setup_tickets) ---
+# --- 2. TICKETY (/tickets) ---
 class CloseTicketView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -133,15 +135,16 @@ class TicketView(discord.ui.View):
         super().__init__(timeout=None)
         self.add_item(TicketSelect())
 
-@bot.tree.command(name="setup_tickets", description="Send tickets panel")
+@bot.tree.command(name="tickets", description="Wysyła panel ticketów Spidermafia")
 @app_commands.checks.has_permissions(administrator=True)
-async def setup_tickets(inter: discord.Interaction):
+async def tickets(inter: discord.Interaction):
     embed = discord.Embed(title="Tickets", description="Wybierz kategorię ticketa z menu poniżej.", color=discord.Color.dark_embed())
+    embed.set_image(url=TICKET_BANNER)
     await inter.channel.send(embed=embed, view=TicketView())
     await inter.response.send_message("Wysłano panel ticketów.", ephemeral=True)
 
 
-# --- 3. POZOSTAŁE KOMENDY (/globalinfo, /reviews, /accept, /say, /minigame, /bandc, /unbandc) ---
+# --- 3. INFORMACJE I REVIEWS (/globalinfo, /reviews) ---
 @bot.tree.command(name="globalinfo", description="Wyświetla ogólne informacje i regulamin Spidermafia")
 @app_commands.checks.has_permissions(administrator=True)
 async def globalinfo(inter: discord.Interaction):
@@ -164,31 +167,15 @@ async def reviews(inter: discord.Interaction):
     await inter.channel.send(embed=embed)
     await inter.response.send_message("Wysłano panel recenzji.", ephemeral=True)
 
-@bot.tree.command(name="accept", description="Accept candidate and give roles")
-@app_commands.checks.has_permissions(administrator=True)
-async def accept(inter: discord.Interaction, member: discord.Member, role: discord.Role):
-    await member.add_roles(role)
-    await inter.response.send_message(f"Zaakceptowano kandydata {member.mention} i przyznano rolę {role.mention}.", ephemeral=True)
 
-@bot.tree.command(name="say", description="Send message as embed")
-@app_commands.checks.has_permissions(administrator=True)
-async def say(inter: discord.Interaction, message: str):
-    embed = discord.Embed(description=message, color=discord.Color.from_rgb(180, 0, 0))
-    await inter.channel.send(embed=embed)
-    await inter.response.send_message("Wysłano wiadomość embed.", ephemeral=True)
-
-@bot.tree.command(name="minigame", description="Try your luck in Spidermafia minigame")
-@app_commands.checks.has_permissions(administrator=True)
-async def minigame(inter: discord.Interaction):
-    await inter.response.send_message("🎲 Minigra Spidermafia: Wkrótce dostępne!", ephemeral=True)
-
-@bot.tree.command(name="bandc", description="Ban user permanently")
+# --- 4. MODERACJA (/bandc, /unbandc) ---
+@bot.tree.command(name="bandc", description="Banuje użytkownika na serwerze")
 @app_commands.checks.has_permissions(administrator=True)
 async def bandc(inter: discord.Interaction, member: discord.Member, reason: str = "Brak powody"):
     await member.ban(reason=reason)
     await inter.response.send_message(f"Zbanowano {member.mention}. Powód: {reason}", ephemeral=True)
 
-@bot.tree.command(name="unbandc", description="Unban user from server")
+@bot.tree.command(name="unbandc", description="Odbanowuje użytkownika po ID")
 @app_commands.checks.has_permissions(administrator=True)
 async def unbandc(inter: discord.Interaction, user_id: str):
     user = await bot.fetch_user(int(user_id))
@@ -196,7 +183,7 @@ async def unbandc(inter: discord.Interaction, user_id: str):
     await inter.response.send_message(f"Odbanowano użytkownika {user.name}.", ephemeral=True)
 
 
-# --- 4. SKLEP: /cheats, /spoofer, /vpn, /bundle, /counterstrike ---
+# --- 5. SKLEP: /cheats, /spoofer, /vpn, /bundle, /counterstrike ---
 class CheatsSelect(discord.ui.Select):
     def __init__(self):
         options = [
@@ -326,6 +313,7 @@ class BundleSelect(discord.ui.Select):
         elif val == "FIVEM READY":
             desc = "``` FIVEM READY ```\n\n│ ***Ceny:*** 💸\n│ • <:fivemready:1561778286516764682> **x1** » `0.70 PLN` 💸\n│ • <:fivemready:1561778286516764682> **x6** » `3.00 PLN` 💸\n\n│ ***Krótki Opis:***\n│ 🟢 » Full Access\n│ 🟢 » Gotowy do użycia\n│ 🟢 » Nie ma banów\n│ 🟢 » 100% Fresh"
             embed = discord.Embed(description=desc, color=discord.Color.from_rgb(180, 0, 0))
+            embed.set_image(url=FIVEM_READY_BANNER)
             await inter.response.send_message(embed=embed, ephemeral=True)
 
 class BundleView(discord.ui.View):
@@ -384,6 +372,6 @@ async def counterstrike(inter: discord.Interaction):
 @bot.event
 async def on_ready():
     await bot.tree.sync()
-    print(f"Bot {bot.user} jest gotowy i zsynchronizowany!")
+    print(f"Bot {bot.user} jest gotowy i zsynchronizowany pod marką Spidermafia!")
 
 bot.run(os.getenv("DISCORD_TOKEN"))
