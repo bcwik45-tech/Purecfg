@@ -5,14 +5,14 @@ from discord import app_commands
 
 # --- KONFIGURACJA POLISHCFG ---
 EMBED_COLOR = 0x2B2D31
-# Tutaj podmień na bezpośredni link do Twojego GIF-a / Logo
+# Podmień poniższy adres na dokładny bezpośredni link do Twojego GIF-a
 GIF_URL = "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjEx.../giphy.gif"
 FOOTER_TEXT = "POLISHCFG • Wszelkie prawa zastrzeżone"
 
 # ID Kanałów
 VERIFY_CHANNEL_ID = 1556706704073424896  # Kanał weryfikacji
 TICKET_CHANNEL_ID = 1561742350986903702  # Kanał ticketów
-VERIFIED_ROLE_ID = 123456789012345680   # Wpisz ID roli po weryfikacji
+VERIFIED_ROLE_ID = 123456789012345680   # ID roli przyznawanej po weryfikacji
 
 class PolishBot(commands.Bot):
     def __init__(self):
@@ -125,4 +125,28 @@ async def setup_tickets(interaction: discord.Interaction):
 # --- KOMENDY MODERACYJNE ---
 @bot.tree.command(name="bandc", description="Banuje użytkownika na serwerze POLISHCFG")
 @app_commands.checks.has_permissions(ban_members=True)
-async def bandc(interaction: discord.Interaction, member
+async def bandc(interaction: discord.Interaction, member: discord.Member, powod: str = "Brak podanego powodu"):
+    await member.ban(reason=powod)
+    await interaction.response.send_message(f"🔨 Zabanowano użytkownika **{member.name}** | Powód: {powod}")
+
+@bot.tree.command(name="unbandc", description="Odbanowuje użytkownika na serwerze POLISHCFG")
+@app_commands.checks.has_permissions(ban_members=True)
+async def unbandc(interaction: discord.Interaction, user_id: str):
+    try:
+        user = await bot.fetch_user(int(user_id))
+        await interaction.guild.unban(user)
+        await interaction.response.send_message(f"🔓 Odbanowano użytkownika **{user.name}**.")
+    except Exception:
+        await interaction.response.send_message("❌ Błąd podczas odbanowywania. Upewnij się, że podano poprawne ID.", ephemeral=True)
+
+@bot.event
+async def on_ready():
+    print(f"Zalogowano jako {bot.user.name}!")
+    bot.add_view(VerifyView())
+    bot.add_view(TicketView())
+
+token = os.getenv("DISCORD_TOKEN")
+if token:
+    bot.run(token)
+else:
+    print("BŁĄD: Brak wartości DISCORD_TOKEN")
