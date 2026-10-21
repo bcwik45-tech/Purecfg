@@ -1,16 +1,18 @@
 import os
 import discord
 from discord.ext import commands
+from discord import app_commands
 
-# --- KONFIGURACJA BRANDINGU POLISHCFG ---
+# --- KONFIGURACJA POLISHCFG ---
 EMBED_COLOR = 0x2B2D31
-BRAND_ICON_URL = "https://cdn.discordapp.com/attachments/1200000000000000000/1200000000000000000/polishcfg_logo.png"
+# Tutaj podmień na bezpośredni link do Twojego GIF-a / Logo
+GIF_URL = "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjEx.../giphy.gif"
 FOOTER_TEXT = "POLISHCFG • Wszelkie prawa zastrzeżone"
 
-# ID Kanałów i Ról (Zastąp własnymi ID, jeśli są inne!)
-VERIFY_CHANNEL_ID = 123456789012345678
-TICKET_CHANNEL_ID = 123456789012345679
-VERIFIED_ROLE_ID = 123456789012345680
+# ID Kanałów
+VERIFY_CHANNEL_ID = 1556706704073424896  # Kanał weryfikacji
+TICKET_CHANNEL_ID = 1561742350986903702  # Kanał ticketów
+VERIFIED_ROLE_ID = 123456789012345680   # Wpisz ID roli po weryfikacji
 
 class PolishBot(commands.Bot):
     def __init__(self):
@@ -20,7 +22,7 @@ class PolishBot(commands.Bot):
         super().__init__(command_prefix="!", intents=intents)
 
     async def setup_hook(self):
-        print("Czyszczenie i synchronizacja komend slash...")
+        print("Synchronizacja komend slash...")
         await self.tree.sync()
         print("Komendy slash zsynchronizowane!")
 
@@ -36,77 +38,91 @@ class VerifyView(discord.ui.View):
         role = interaction.guild.get_role(VERIFIED_ROLE_ID)
         if role:
             await interaction.user.add_roles(role)
-            await interaction.response.send_message("✅ Pomyślnie zweryfikowano! Uzyskano dostęp do serwera POLISHCFG.", ephemeral=True)
+            await interaction.response.send_message("✅ Pomyślnie zweryfikowano na serwerze POLISHCFG!", ephemeral=True)
         else:
-            await interaction.response.send_message("❌ Błąd: Nie znaleziono roli weryfikacyjnej na serwerze.", ephemeral=True)
+            await interaction.response.send_message("❌ Nie znaleziono skonfigurowanej roli weryfikacyjnej.", ephemeral=True)
 
-# --- PANEL TICKETÓW ---
-class TicketView(discord.ui.View):
+# --- PANEL TICKETÓW (ROZWIJANA LISTA KATEGORII) ---
+class TicketSelect(discord.ui.Select):
     def __init__(self):
-        super().__init__(timeout=None)
+        options = [
+            discord.SelectOption(label="Ticket Owner", description="Open if you have a demand to the owners.", emoji="👑"),
+            discord.SelectOption(label="Ticket Shop", description="Open if you want to buy something.", emoji="🛒"),
+            discord.SelectOption(label="Ticket Support", description="Open if you need any help.", emoji="🛠️"),
+            discord.SelectOption(label="Ticket Partner", description="Open if you want to collaborate with us.", emoji="🤝"),
+        ]
+        super().__init__(placeholder="Select category...", min_values=1, max_values=1, custom_id="ticket_select_category", options=options)
 
-    @discord.ui.button(label="Otwórz Ticket", style=discord.ButtonStyle.blurple, custom_id="ticket_btn", emoji="📩")
-    async def create_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def callback(self, interaction: discord.Interaction):
+        category_name = self.values[0]
         guild = interaction.guild
+        
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(read_messages=False),
             interaction.user: discord.PermissionOverwrite(read_messages=True, send_messages=True),
             guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True)
         }
         
-        channel_name = f"ticket-{interaction.user.name}"
+        clean_cat = category_name.lower().replace(' ', '-')
+        channel_name = f"{clean_cat}-{interaction.user.name}"
         ticket_channel = await guild.create_text_channel(name=channel_name, overwrites=overwrites)
         
-        ticket_description = f"Witaj {interaction.user.mention}!\nOpisz swój problem, a nasza obsługa odpowie najszybciej jak to możliwe."
-        
         embed = discord.Embed(
-            title="POLISHCFG • Pomoc i Wsparcie",
-            description=ticket_description,
+            title=f"POLISHCFG • {category_name}",
+            description=f"Witaj {interaction.user.mention}!\nKategoria: **{category_name}**.\nOpisz swój problem, a administracja odpowie najszybciej jak to możliwe.",
             color=EMBED_COLOR
         )
-        embed.set_thumbnail(url=BRAND_ICON_URL)
+        if GIF_URL.startswith("http"):
+            embed.set_image(url=GIF_URL)
         embed.set_footer(text=FOOTER_TEXT)
         
         await ticket_channel.send(embed=embed)
-        await interaction.response.send_message(f"✅ Utworzono Twój ticket: {ticket_channel.mention}", ephemeral=True)
+        await interaction.response.send_message(f"✅ Stworzono kanał zgłoszenia: {ticket_channel.mention}", ephemeral=True)
 
-# --- KOMENDY SLASH ---
-@bot.tree.command(name="setup_weryfikacja", description="Wysyła panel weryfikacyjny POLISHCFG")
+class TicketView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(TicketSelect())
+
+# --- KOMENDY SETUP ---
+@bot.tree.command(name="setup_weryfikacja", description="Wysyła panel weryfikacyjny na kanał verification")
 async def setup_weryfikacja(interaction: discord.Interaction):
     channel = bot.get_channel(VERIFY_CHANNEL_ID) or interaction.channel
     embed = discord.Embed(
         title="POLISHCFG • Weryfikacja",
-        description="Kliknij poniższy przycisk, aby zweryfikować swoje konto i uzyskać pełen dostęp do serwera.",
+        description="Kliknij poniższy przycisk, aby zweryfikować swoje konto i uzyskać dostęp do serwera.",
         color=EMBED_COLOR
     )
-    embed.set_thumbnail(url=BRAND_ICON_URL)
+    if GIF_URL.startswith("http"):
+        embed.set_image(url=GIF_URL)
     embed.set_footer(text=FOOTER_TEXT)
     
     await channel.send(embed=embed, view=VerifyView())
-    await interaction.response.send_message("✅ Panel weryfikacji został wysłany!", ephemeral=True)
+    await interaction.response.send_message(f"✅ Panel weryfikacji wysłany na {channel.mention}!", ephemeral=True)
 
-@bot.tree.command(name="setup_tickets", description="Wysyła panel pomocy ticket POLISHCFG")
+@bot.tree.command(name="setup_tickets", description="Wysyła panel ticketów z rozwijaną listą")
 async def setup_tickets(interaction: discord.Interaction):
     channel = bot.get_channel(TICKET_CHANNEL_ID) or interaction.channel
+    
     embed = discord.Embed(
-        title="POLISHCFG • Centrum Pomocy",
-        description="Potrzebujesz pomocy lub masz pytanie odnośnie naszych konfiguracji?\nKliknij poniżej, aby otworzyć zgłoszenie.",
+        title="Tickets",
+        description=(
+            "**Ticket Owner**\n*Open if you have a demand to the owners.*\n\n"
+            "**Ticket Shop**\n*Open if you want to buy something.*\n\n"
+            "**Ticket Support**\n*Open if you need any help.*\n\n"
+            "**Ticket Partner**\n*Open if you want to collaborate with us.*\n\n"
+            "For any issues, text us in #chat"
+        ),
         color=EMBED_COLOR
     )
-    embed.set_thumbnail(url=BRAND_ICON_URL)
+    if GIF_URL.startswith("http"):
+        embed.set_image(url=GIF_URL)
     embed.set_footer(text=FOOTER_TEXT)
     
     await channel.send(embed=embed, view=TicketView())
-    await interaction.response.send_message("✅ Panel ticketów został wysłany!", ephemeral=True)
+    await interaction.response.send_message(f"✅ Panel ticketów wysłany na {channel.mention}!", ephemeral=True)
 
-@bot.event
-async def on_ready():
-    print(f"Zalogowano jako {bot.user.name}!")
-    bot.add_view(VerifyView())
-    bot.add_view(TicketView())
-
-token = os.getenv("DISCORD_TOKEN")
-if token:
-    bot.run(token)
-else:
-    print("BŁĄD: Brak wartości DISCORD_TOKEN w zmiennych środowiskowych!")
+# --- KOMENDY MODERACYJNE ---
+@bot.tree.command(name="bandc", description="Banuje użytkownika na serwerze POLISHCFG")
+@app_commands.checks.has_permissions(ban_members=True)
+async def bandc(interaction: discord.Interaction, member
