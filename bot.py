@@ -1,18 +1,26 @@
 import os
+import datetime
+from zoneinfo import ZoneInfo
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 from discord import app_commands
 
 # --- KONFIGURACJA POLISHCFG ---
 EMBED_COLOR = 0x2B2D31
-# Podmień poniższy adres na dokładny bezpośredni link do Twojego GIF-a
-GIF_URL = "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjEx.../giphy.gif"
+BANNER_URL = "https://cdn.discordapp.com/attachments/1556074439030865950/1562881661358706870/gg.polishcfg.png"
 FOOTER_TEXT = "POLISHCFG • Wszelkie prawa zastrzeżone"
 
-# ID Kanałów
-VERIFY_CHANNEL_ID = 1556706704073424896  # Kanał weryfikacji
-TICKET_CHANNEL_ID = 1561742350986903702  # Kanał ticketów
-VERIFIED_ROLE_ID = 123456789012345680   # ID roli przyznawanej po weryfikacji
+# --- ID KANAŁÓW I RÓL ---
+WELCOME_CHANNEL_ID = 1561740336726937660
+TICKET_CHANNEL_ID = 1561742350986903702
+MINIGAME_CHANNEL_ID = 1562815793547182173
+ALLOWED_COMMAND_CHANNEL_ID = 1561758533446410251
+
+AUTO_ROLE_ID = 1540360249775493230          # Ranga nadawana automatycznie po wejściu
+MINIGAME_REWARD_ROLE_ID = 1562816846535729222
+
+# Słownik do śledzenia cooldownu minigry: {user_id: data_ostatniej_gry}
+minigame_cooldowns = {}
 
 class PolishBot(commands.Bot):
     def __init__(self):
@@ -25,128 +33,235 @@ class PolishBot(commands.Bot):
         print("Synchronizacja komend slash...")
         await self.tree.sync()
         print("Komendy slash zsynchronizowane!")
+        daily_minigame_reminder.start()
+        reset_minigame_cooldowns.start()
 
 bot = PolishBot()
 
-# --- PANEL WERYFIKACJI ---
-class VerifyView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
+# --- ZDARZENIE: WEJŚCIE UŻYTKOWNIKA ---
+@bot.event
+async def on_member_join(member: discord.Member):
+    # Automatyczne nadanie rangi od razu po wejściu na serwer
+    role = member.guild.get_role(AUTO_ROLE_ID)
+    if role:
+        try:
+            await member.add_roles(role)
+        except Exception as e:
+            print(f"Błąd przy nadawaniu rangi: {e}")
 
-    @discord.ui.button(label="Zweryfikuj się", style=discord.ButtonStyle.green, custom_id="verify_btn", emoji="✅")
-    async def verify(self, interaction: discord.Interaction, button: discord.ui.Button):
-        role = interaction.guild.get_role(VERIFIED_ROLE_ID)
-        if role:
-            await interaction.user.add_roles(role)
-            await interaction.response.send_message("✅ Pomyślnie zweryfikowano na serwerze POLISHCFG!", ephemeral=True)
-        else:
-            await interaction.response.send_message("❌ Nie znaleziono skonfigurowanej roli weryfikacyjnej.", ephemeral=True)
+    # Wiadomość powitalna
+    channel = member.guild.get_channel(WELCOME_CHANNEL_ID)
+    if channel:
+        member_count = member.guild.member_count
+        created_at = member.created_at.strftime("%Y-%m-%d %H:%M:%S")
+        joined_at = member.joined_at.strftime("%Y-%m-%d %H:%M:%S")
 
-# --- PANEL TICKETÓW (ROZWIJANA LISTA KATEGORII) ---
+        embed = discord.Embed(
+            title="New user joined us! 🙂",
+            description=f"👋 **Hi {member.mention} We're glad to have you here!**\n\nGo check out our fivem stuff!\nDon't forget to read the rules!\n**You're our {member_count} member!**",
+            color=EMBED_COLOR
+        )
+        embed.add_field(
+            name="📢 User Information",
+            value=f"👾 **Discord account created:** `<t:{int(member.created_at.timestamp())}:R>` ({created_at})\n👤 **Username:** `{member.name}`\n📅 **Joined at:** `{joined_at}`",
+            inline=False
+        )
+        if BANNER_URL.startswith("http"):
+            embed.set_image(url=BANNER_URL)
+        embed.set_footer(text="polishcfg")
+
+        await channel.send(embed=embed)
+
+# --- CODZIENNE PRZYPOMNIENIE O 19:00 ---
+@tasks.loop(time=datetime.time(hour=19, minute=0, tzinfo=ZoneInfo("Europe/Warsaw")))
+async def daily_minigame_reminder():
+    channel = bot.get_channel(MINIGAME_CHANNEL_ID)
+    if channel:
+        embed = discord.Embed(
+            title="🎮 Codzienna Minigra!",
+            description="Czas spróbować swojego szczęścia w minigrze na naszym kanale! Wejdź i wygraj nagrody.",
+            color=EMBED_COLOR
+        )
+        if BANNER_URL.startswith("http"):
+            embed.set_image(url=BANNER_URL)
+        embed.set_footer(text=FOOTER_TEXT)
+        await channel.send(embed=embed)
+
+# --- RESET COOLDOWNU O 23:59 ---
+@tasks.loop(time=datetime.time(hour=23, minute=59, tzinfo=ZoneInfo("Europe/Warsaw")))
+async def reset_minigame_cooldowns():
+    minigame_cooldowns.clear()
+
+@daily_minigame_reminder.before_loop
+@reset_minigame_cooldowns.before_loop
+async def before_loops():
+    await bot.wait_until_ready()
+
+# --- PANEL TICKETÓW ---
 class TicketSelect(discord.ui.Select):
     def __init__(self):
         options = [
-            discord.SelectOption(label="Ticket Owner", description="Open if you have a demand to the owners.", emoji="👑"),
-            discord.SelectOption(label="Ticket Shop", description="Open if you want to buy something.", emoji="🛒"),
-            discord.SelectOption(label="Ticket Support", description="Open if you need any help.", emoji="🛠️"),
-            discord.SelectOption(label="Ticket Partner", description="Open if you want to collaborate with us.", emoji="🤝"),
+            discord.SelectOption(label="Owner", description="ticket with a matter for the config owners", emoji="👑"),
+            discord.SelectOption(label="Shop", description="Ticket for purchase an item from our store", emoji="🛒"),
+            discord.SelectOption(label="Support", description="Support ticket for help in our config server", emoji="❓"),
+            discord.SelectOption(label="Partner", description="Ticket for partnership", emoji="🤝"),
         ]
-        super().__init__(placeholder="Select category...", min_values=1, max_values=1, custom_id="ticket_select_category", options=options)
+        super().__init__(placeholder="Select category...", min_values=1, max_values=1, custom_id="ticket_select_cat", options=options)
 
     async def callback(self, interaction: discord.Interaction):
-        category_name = self.values[0]
+        cat = self.values[0]
         guild = interaction.guild
-        
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(read_messages=False),
             interaction.user: discord.PermissionOverwrite(read_messages=True, send_messages=True),
             guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True)
         }
-        
-        clean_cat = category_name.lower().replace(' ', '-')
-        channel_name = f"{clean_cat}-{interaction.user.name}"
-        ticket_channel = await guild.create_text_channel(name=channel_name, overwrites=overwrites)
+        ticket_chan = await guild.create_text_channel(name=f"{cat.lower()}-{interaction.user.name}", overwrites=overwrites)
         
         embed = discord.Embed(
-            title=f"POLISHCFG • {category_name}",
-            description=f"Witaj {interaction.user.mention}!\nKategoria: **{category_name}**.\nOpisz swój problem, a administracja odpowie najszybciej jak to możliwe.",
+            title=f"POLISHCFG • {cat}",
+            description=f"Witaj {interaction.user.mention}!\nWybrano kategorię: **{cat}**.\nOpisz swój problem lub sprawę.",
             color=EMBED_COLOR
         )
-        if GIF_URL.startswith("http"):
-            embed.set_image(url=GIF_URL)
+        if BANNER_URL.startswith("http"):
+            embed.set_image(url=BANNER_URL)
         embed.set_footer(text=FOOTER_TEXT)
         
-        await ticket_channel.send(embed=embed)
-        await interaction.response.send_message(f"✅ Stworzono kanał zgłoszenia: {ticket_channel.mention}", ephemeral=True)
+        await ticket_chan.send(embed=embed)
+        await interaction.response.send_message(f"✅ Utworzono ticket: {ticket_chan.mention}", ephemeral=True)
 
 class TicketView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
         self.add_item(TicketSelect())
 
-# --- KOMENDY SETUP ---
-@bot.tree.command(name="setup_weryfikacja", description="Wysyła panel weryfikacyjny na kanał verification")
-async def setup_weryfikacja(interaction: discord.Interaction):
-    channel = bot.get_channel(VERIFY_CHANNEL_ID) or interaction.channel
-    embed = discord.Embed(
-        title="POLISHCFG • Weryfikacja",
-        description="Kliknij poniższy przycisk, aby zweryfikować swoje konto i uzyskać dostęp do serwera.",
-        color=EMBED_COLOR
-    )
-    if GIF_URL.startswith("http"):
-        embed.set_image(url=GIF_URL)
-    embed.set_footer(text=FOOTER_TEXT)
-    
-    await channel.send(embed=embed, view=VerifyView())
-    await interaction.response.send_message(f"✅ Panel weryfikacji wysłany na {channel.mention}!", ephemeral=True)
-
-@bot.tree.command(name="setup_tickets", description="Wysyła panel ticketów z rozwijaną listą")
+# --- KOMENDA SETUP TICKETS ---
+@bot.tree.command(name="setup_tickets", description="Wysyła panel ticketów")
 async def setup_tickets(interaction: discord.Interaction):
-    channel = bot.get_channel(TICKET_CHANNEL_ID) or interaction.channel
-    
+    if interaction.channel_id != ALLOWED_COMMAND_CHANNEL_ID:
+        await interaction.response.send_message(f"❌ Tej komendy można używać tylko na kanale <#{ALLOWED_COMMAND_CHANNEL_ID}>!", ephemeral=True)
+        return
+
     embed = discord.Embed(
         title="Tickets",
         description=(
             "**Ticket Owner**\n*Open if you have a demand to the owners.*\n\n"
-            "**Ticket Shop**\n*Open if you want to buy something.*\n\n"
+            "**Ticket Shop**\n*open if you you want to buy something.*\n\n"
             "**Ticket Support**\n*Open if you need any help.*\n\n"
             "**Ticket Partner**\n*Open if you want to collaborate with us.*\n\n"
-            "For any issues, text us in #chat"
+            "**For any issues, text on #chat**"
         ),
         color=EMBED_COLOR
     )
-    if GIF_URL.startswith("http"):
-        embed.set_image(url=GIF_URL)
-    embed.set_footer(text=FOOTER_TEXT)
+    if BANNER_URL.startswith("http"):
+        embed.set_image(url=BANNER_URL)
+    embed.set_footer(text="POLISHCFG")
     
+    channel = bot.get_channel(TICKET_CHANNEL_ID) or interaction.channel
     await channel.send(embed=embed, view=TicketView())
-    await interaction.response.send_message(f"✅ Panel ticketów wysłany na {channel.mention}!", ephemeral=True)
+    await interaction.response.send_message("✅ Wysłano panel ticketów!", ephemeral=True)
 
-# --- KOMENDY MODERACYJNE ---
-@bot.tree.command(name="bandc", description="Banuje użytkownika na serwerze POLISHCFG")
+# --- KOMENDA MINIGAME ---
+@bot.tree.command(name="minigame", description="Zagraj w codzienną minigrę!")
+async def minigame(interaction: discord.Interaction):
+    if interaction.channel_id != MINIGAME_CHANNEL_ID:
+        await interaction.response.send_message(f"❌ Minigry można używać tylko na kanale <#{MINIGAME_CHANNEL_ID}>!", ephemeral=True)
+        return
+
+    user_id = interaction.user.id
+    dzis = datetime.datetime.now(ZoneInfo("Europe/Warsaw")).date()
+
+    if minigame_cooldowns.get(user_id) == dzis:
+        await interaction.response.send_message("⏳ Wykorzystałeś już próbę na dziś! Spróbuj ponownie jutro lub po godzinie 23:59.", ephemeral=True)
+        return
+
+    minigame_cooldowns[user_id] = dzis
+    
+    import random
+    win = random.randint(1, 5) == 1
+
+    embed = discord.Embed(color=EMBED_COLOR)
+    if BANNER_URL.startswith("http"):
+        embed.set_image(url=BANNER_URL)
+    embed.set_footer(text=FOOTER_TEXT)
+
+    if win:
+        role = interaction.guild.get_role(MINIGAME_REWARD_ROLE_ID)
+        if role:
+            await interaction.user.add_roles(role)
+        embed.title = "🎉 Gratulacje!"
+        embed.description = f"🐱 {interaction.user.mention}, **wygrałeś w minigrze!** Otrzymałeś specjalną nagrodę i rolę!"
+    else:
+        embed.title = "🐱 We're sorry!"
+        embed.description = f"🐈 {interaction.user.mention}, **this time you didn't win anything.** Try your luck again tomorrow!\n\n**Some Info:**\n*Your chance was **1** in **5**.*\n\n*We wish you better luck next time!*"
+
+    await interaction.response.send_message(embed=embed)
+
+# --- KOMENDY BANDC / UNBANDC ---
+@bot.tree.command(name="bandc", description="Banuje użytkownika na serwerze")
 @app_commands.checks.has_permissions(ban_members=True)
-async def bandc(interaction: discord.Interaction, member: discord.Member, powod: str = "Brak podanego powodu"):
-    await member.ban(reason=powod)
-    await interaction.response.send_message(f"🔨 Zabanowano użytkownika **{member.name}** | Powód: {powod}")
+async def bandc(interaction: discord.Interaction, member: discord.Member, reason: str = "Brak powodu"):
+    await member.ban(reason=reason)
+    
+    embed = discord.Embed(
+        title="🔨 User has been banned for life",
+        color=0xFF0000
+    )
+    embed.add_field(name="👤 User", value=f"{member.mention}", inline=True)
+    embed.add_field(name="🆔 ID", value=f"`{member.id}`", inline=True)
+    embed.add_field(name="🛡️ Administrator", value=f"{interaction.user.mention}", inline=False)
+    embed.add_field(name="📝 Reason", value=f"`{reason}`", inline=False)
+    if BANNER_URL.startswith("http"):
+        embed.set_image(url=BANNER_URL)
+    embed.set_footer(text="POLISHCFG Security")
 
-@bot.tree.command(name="unbandc", description="Odbanowuje użytkownika na serwerze POLISHCFG")
+    await interaction.response.send_message(embed=embed)
+
+@bot.tree.command(name="unbandc", description="Odbanowuje użytkownika po ID")
 @app_commands.checks.has_permissions(ban_members=True)
 async def unbandc(interaction: discord.Interaction, user_id: str):
     try:
         user = await bot.fetch_user(int(user_id))
         await interaction.guild.unban(user)
-        await interaction.response.send_message(f"🔓 Odbanowano użytkownika **{user.name}**.")
+        
+        embed = discord.Embed(
+            title="🔓 User has been unbanned",
+            description=f"Użytkownik **{user.name}** (`{user.id}`) został pomyślnie odbanowany.",
+            color=0x00FF00
+        )
+        if BANNER_URL.startswith("http"):
+            embed.set_image(url=BANNER_URL)
+        embed.set_footer(text="POLISHCFG Security")
+        
+        await interaction.response.send_message(embed=embed)
     except Exception:
-        await interaction.response.send_message("❌ Błąd podczas odbanowywania. Upewnij się, że podano poprawne ID.", ephemeral=True)
+        await interaction.response.send_message("❌ Nie znaleziono użytkownika lub błąd odbanowania.", ephemeral=True)
+
+# --- KOMENDA SAY ---
+@bot.tree.command(name="say", description="Wysyła wiadomość na wskazany kanał")
+@app_commands.checks.has_permissions(manage_messages=True)
+async def say(interaction: discord.Interaction, channel_id: str, message: str):
+    if interaction.channel_id != ALLOWED_COMMAND_CHANNEL_ID:
+        await interaction.response.send_message(f"❌ Tej komendy można używać tylko na kanale <#{ALLOWED_COMMAND_CHANNEL_ID}>!", ephemeral=True)
+        return
+
+    try:
+        channel = bot.get_channel(int(channel_id))
+        if channel:
+            await channel.send(message)
+            await interaction.response.send_message(f"✅ Wysłano wiadomość na kanał {channel.mention}!", ephemeral=True)
+        else:
+            await interaction.response.send_message("❌ Nie znaleziono kanału o podanym ID.", ephemeral=True)
+    except Exception:
+        await interaction.response.send_message("❌ Wystąpił błąd. Upewnij się, że podano poprawne ID kanału.", ephemeral=True)
 
 @bot.event
 async def on_ready():
     print(f"Zalogowano jako {bot.user.name}!")
-    bot.add_view(VerifyView())
     bot.add_view(TicketView())
 
 token = os.getenv("DISCORD_TOKEN")
 if token:
     bot.run(token)
 else:
-    print("BŁĄD: Brak wartości DISCORD_TOKEN")
+    print("BŁĄD: Brak zmiennej DISCORD_TOKEN!")
