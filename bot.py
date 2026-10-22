@@ -12,14 +12,14 @@ FOOTER_TEXT = "POLISHCFG • Wszelkie prawa zastrzeżone"
 
 # --- ID KANAŁÓW I RÓL ---
 WELCOME_CHANNEL_ID = 1561740336726937660
+BOOST_CHANNEL_ID = 1561740466989301821      # Kanał dla boostów
 TICKET_CHANNEL_ID = 1561742350986903702
 MINIGAME_CHANNEL_ID = 1562815793547182173
 ALLOWED_COMMAND_CHANNEL_ID = 1561758533446410251
 
-AUTO_ROLE_ID = 1540360249775493230          # Ranga nadawana automatycznie po wejściu
+AUTO_ROLE_ID = 1540360249775493230
 MINIGAME_REWARD_ROLE_ID = 1562816846535729222
 
-# Słownik do śledzenia cooldownu minigry: {user_id: data_ostatniej_gry}
 minigame_cooldowns = {}
 
 class PolishBot(commands.Bot):
@@ -41,15 +41,13 @@ bot = PolishBot()
 # --- ZDARZENIE: WEJŚCIE UŻYTKOWNIKA ---
 @bot.event
 async def on_member_join(member: discord.Member):
-    # Automatyczne nadanie rangi od razu po wejściu na serwer
     role = member.guild.get_role(AUTO_ROLE_ID)
     if role:
         try:
             await member.add_roles(role)
-        except Exception as e:
-            print(f"Błąd przy nadawaniu rangi: {e}")
+        except Exception:
+            pass
 
-    # Wiadomość powitalna
     channel = member.guild.get_channel(WELCOME_CHANNEL_ID)
     if channel:
         member_count = member.guild.member_count
@@ -71,6 +69,29 @@ async def on_member_join(member: discord.Member):
         embed.set_footer(text="polishcfg")
 
         await channel.send(embed=embed)
+
+# --- ZDARZENIE: SERWER BOOST ---
+@bot.event
+async def on_member_update(before: discord.Member, after: discord.Member):
+    if before.premium_since is None and after.premium_since is not None:
+        channel = after.guild.get_channel(BOOST_CHANNEL_ID)
+        if channel:
+            embed = discord.Embed(
+                title="💎 New server Boost!",
+                description=f"{after.mention} **BOOST!**\n> thanks for boosting our server!\n> *Go check out our booster zone!*",
+                color=EMBED_COLOR
+            )
+            embed.add_field(
+                name="🚀 Boost level",
+                value=f"🎲 **Server Boost level:** `{after.guild.premium_tier}`\n🔢 **Boost count:** `{after.guild.premium_subscription_count}`",
+                inline=False
+            )
+            embed.set_thumbnail(url=after.display_avatar.url)
+            if BANNER_URL.startswith("http"):
+                embed.set_image(url=BANNER_URL)
+            embed.set_footer(text="polishcfg")
+
+            await channel.send(embed=embed)
 
 # --- CODZIENNE PRZYPOMNIENIE O 19:00 ---
 @tasks.loop(time=datetime.time(hour=19, minute=0, tzinfo=ZoneInfo("Europe/Warsaw")))
@@ -161,6 +182,26 @@ async def setup_tickets(interaction: discord.Interaction):
     await channel.send(embed=embed, view=TicketView())
     await interaction.response.send_message("✅ Wysłano panel ticketów!", ephemeral=True)
 
+# --- KOMENDA TESTOWA BOOST ---
+@bot.tree.command(name="test_boost", description="Testuje wygląd powiadomienia o booscie")
+async def test_boost(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="💎 New server Boost!",
+        description=f"{interaction.user.mention} **BOOST!**\n> thanks for boosting our server!\n> *Go check out our booster zone!*",
+        color=EMBED_COLOR
+    )
+    embed.add_field(
+        name="🚀 Boost level",
+        value=f"🎲 **Server Boost level:** `{interaction.guild.premium_tier}`\n🔢 **Boost count:** `{interaction.guild.premium_subscription_count}`",
+        inline=False
+    )
+    embed.set_thumbnail(url=interaction.user.display_avatar.url)
+    if BANNER_URL.startswith("http"):
+        embed.set_image(url=BANNER_URL)
+    embed.set_footer(text="polishcfg")
+
+    await interaction.response.send_message(embed=embed)
+
 # --- KOMENDA MINIGAME ---
 @bot.tree.command(name="minigame", description="Zagraj w codzienną minigrę!")
 async def minigame(interaction: discord.Interaction):
@@ -238,22 +279,45 @@ async def unbandc(interaction: discord.Interaction, user_id: str):
         await interaction.response.send_message("❌ Nie znaleziono użytkownika lub błąd odbanowania.", ephemeral=True)
 
 # --- KOMENDA SAY ---
-@bot.tree.command(name="say", description="Wysyła wiadomość na wskazany kanał")
+@bot.tree.command(name="say", description="Wysyła ramkę z wiadomością na wskazany kanał")
 @app_commands.checks.has_permissions(manage_messages=True)
-async def say(interaction: discord.Interaction, channel_id: str, message: str):
+async def say(
+    interaction: discord.Interaction, 
+    channel_id: str, 
+    wiadomosc: str, 
+    tytul: str = None, 
+    obrazek: str = None, 
+    stopka: str = "polishcfg"
+):
     if interaction.channel_id != ALLOWED_COMMAND_CHANNEL_ID:
         await interaction.response.send_message(f"❌ Tej komendy można używać tylko na kanale <#{ALLOWED_COMMAND_CHANNEL_ID}>!", ephemeral=True)
         return
 
     try:
         channel = bot.get_channel(int(channel_id))
-        if channel:
-            await channel.send(message)
-            await interaction.response.send_message(f"✅ Wysłano wiadomość na kanał {channel.mention}!", ephemeral=True)
-        else:
+        if not channel:
             await interaction.response.send_message("❌ Nie znaleziono kanału o podanym ID.", ephemeral=True)
-    except Exception:
-        await interaction.response.send_message("❌ Wystąpił błąd. Upewnij się, że podano poprawne ID kanału.", ephemeral=True)
+            return
+
+        formatted_message = wiadomosc.replace("\\n", "\n")
+
+        embed = discord.Embed(
+            title=tytul,
+            description=formatted_message,
+            color=EMBED_COLOR
+        )
+
+        if obrazek and obrazek.startswith("http"):
+            embed.set_image(url=obrazek)
+
+        if stopka:
+            embed.set_footer(text=stopka)
+
+        await channel.send(embed=embed)
+        await interaction.response.send_message(f"✅ Wysłano ramkę na kanał {channel.mention}!", ephemeral=True)
+
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Wystąpił błąd: {e}", ephemeral=True)
 
 @bot.event
 async def on_ready():
