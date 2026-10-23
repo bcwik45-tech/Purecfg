@@ -1,8 +1,9 @@
+import os
 import discord
 from discord.ext import commands
 from discord import app_commands
 
-# --- KONFIGURACJA ID ---
+# --- KONFIGURACJA ID I LINKÓW ---
 BANNER_URL = "https://cdn.discordapp.com/attachments/1563303323539476520/1563303364106649620/savage_hallowen.jpg?ex=6add2336&is=6adbd1b6&hm=83cd3b66fa3da205eb25fef7fe2d6866d35a92f367982641f9343d95d6b00cdf&"
 
 # Kanały
@@ -42,7 +43,7 @@ class CloseTicketView(discord.ui.View):
         await interaction.response.send_message(embed=embed)
         await interaction.channel.delete()
 
-# --- SELECT MENU DO SELEKCJI TICKETÓW ---
+# --- SELECT MENU DO TICKETA ---
 class TicketSelect(discord.ui.Select):
     def __init__(self):
         options = [
@@ -83,7 +84,6 @@ class TicketSelect(discord.ui.Select):
         guild = interaction.guild
         category_name = self.values[0]
         
-        # Dobieranie ról oraz emotki dla kanału
         ping_roles = []
         emoji_prefix = "🎫"
 
@@ -103,7 +103,6 @@ class TicketSelect(discord.ui.Select):
             ping_roles = STAFF_ROLES
             emoji_prefix = "📝"
 
-        # Tworzenie kanału ticketa z ikonką w nazwie
         channel_name = f"{emoji_prefix}・ticket-{interaction.user.name}"
         
         overwrites = {
@@ -119,7 +118,6 @@ class TicketSelect(discord.ui.Select):
 
         ticket_channel = await guild.create_text_channel(name=channel_name, overwrites=overwrites)
 
-        # Treść wewnątrz otwartego ticketa
         pings_formatted = " ".join([f"<@&{r_id}>" for r_id in ping_roles])
         
         embed = discord.Embed(
@@ -145,14 +143,13 @@ async def on_ready():
     bot.add_view(CloseTicketView())
     try:
         synced = await bot.tree.sync()
-        print(f"Zsynchronizowano {len(synced)} komend /")
+        print(f"Zsynchronizowano {len(synced)} komend slash")
     except Exception as e:
-        print(e)
+        print(f"Błąd podczas synchronizacji komend: {e}")
 
-# Auto-rola + Powitanie z bannerem
+# Auto-rola + Powitanie
 @bot.event
 async def on_member_join(member: discord.Member):
-    # Auto-rola
     role = member.guild.get_role(AUTO_ROLE_ID)
     if role:
         try:
@@ -160,11 +157,10 @@ async def on_member_join(member: discord.Member):
         except Exception as e:
             print(f"Błąd podczas nadawania roli: {e}")
 
-    # Embed powitalny
     welcome_channel = member.guild.get_channel(WELCOME_CHANNEL_ID)
     if welcome_channel:
         embed = discord.Embed(
-            title=f"SAVAGE × NOWA OSOBA",
+            title="SAVAGE × NOWA OSOBA",
             description=f"➥ | Witaj {member.mention} na **SAVAGE**!\n❤ | Mamy nadzieję, że zostaniesz z nami na dłużej\n\n⚠ | Nieprzestrzeganie naszego **regulaminu** może wiązać się z karą",
             color=0x2b2d31
         )
@@ -177,7 +173,6 @@ async def on_member_join(member: discord.Member):
 @bot.event
 async def on_member_update(before: discord.Member, after: discord.Member):
     if len(before.roles) < len(after.roles):
-        # Sprawdzanie czy otrzymano rolę Booster
         premium_role = after.guild.premium_subscriber_role
         if premium_role and premium_role not in before.roles and premium_role in after.roles:
             boost_channel = after.guild.get_channel(BOOST_CHANNEL_ID)
@@ -192,9 +187,7 @@ async def on_member_update(before: discord.Member, after: discord.Member):
                 embed.set_image(url=BANNER_URL)
                 await boost_channel.send(embed=embed)
 
-# --- KOMENDY SLASH (APP COMMANDS) ---
-
-# Komenda /setup_tickets
+# --- KOMENDY SLASH ---
 @bot.tree.command(name="setup_tickets", description="Wysyła panel ticketów na odpowiedni kanał")
 async def setup_tickets(interaction: discord.Interaction):
     if interaction.channel_id != SETUP_CMD_CHANNEL_ID:
@@ -214,7 +207,6 @@ async def setup_tickets(interaction: discord.Interaction):
     await target_channel.send(embed=embed, view=TicketView())
     await interaction.response.send_message(f"Pomyślnie wysłano panel ticketów na kanał {target_channel.mention}!", ephemeral=True)
 
-# Komenda /say
 @bot.tree.command(name="say", description="Wysyła ogłoszenie w formie estetycznego embeda")
 @app_commands.describe(wiadomosc="Treść wiadomości", kanal="Kanał na którym ma zostać wysłana wiadomość")
 async def say(interaction: discord.Interaction, wiadomosc: str, kanal: discord.TextChannel):
@@ -227,7 +219,6 @@ async def say(interaction: discord.Interaction, wiadomosc: str, kanal: discord.T
     await kanal.send(embed=embed)
     await interaction.response.send_message(f"Wysłano wiadomość na kanał {kanal.mention}!", ephemeral=True)
 
-# Komenda /bandc (Ban i czyszczenie)
 @bot.tree.command(name="bandc", description="Baniuje użytkownika i czyści jego wiadomości")
 @app_commands.describe(user="Użytkownik do zbanowania", powod="Powód bana")
 async def bandc(interaction: discord.Interaction, user: discord.Member, powod: str = "Brak powodu"):
@@ -240,7 +231,6 @@ async def bandc(interaction: discord.Interaction, user: discord.Member, powod: s
     embed.set_image(url=BANNER_URL)
     await interaction.response.send_message(embed=embed)
 
-# Komenda /unbandc (Unban)
 @bot.tree.command(name="unbandc", description="Odbanowuje użytkownika")
 @app_commands.describe(user_id="ID użytkownika do odbanowania", powod="Powód odbanowania")
 async def unbandc(interaction: discord.Interaction, user_id: str, powod: str = "Brak powodu"):
@@ -257,5 +247,10 @@ async def unbandc(interaction: discord.Interaction, user_id: str, powod: str = "
     except Exception as e:
         await interaction.response.send_message(f"Nie udało się odbanować użytkownika. Upewnij się, że podałeś poprawne ID. Błąd: {e}", ephemeral=True)
 
-# URUCHOMIENIE BOTA
-bot.run("TWÓJ_TOKEN_BOTA_TUTAJ")
+# --- URUCHOMIENIE BOTA ZE ZMIENNEJ ŚRODOWISKOWEJ ---
+TOKEN = os.getenv("DISCORD_TOKEN")
+
+if TOKEN:
+    bot.run(TOKEN)
+else:
+    print("CRITICAL ERROR: Brak zmiennej środowiskowej DISCORD_TOKEN! Ustaw ją w panelu Rendera w zakładce Environment.")
