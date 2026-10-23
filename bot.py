@@ -12,8 +12,11 @@ TICKET_PANEL_CHANNEL_ID = 1561742350986903702
 WELCOME_CHANNEL_ID = 1561740336726937660
 BOOST_CHANNEL_ID = 1563296339847282771
 
-# Rola startowa
+# Rola startowa dla nowych osób
 AUTO_ROLE_ID = 1540360249775493230
+
+# Role z uprawnieniami do komend (/setup_tickets, /say, /bandc, /unbandc) oraz zarządzenie ticketami
+ALLOWED_COMMAND_ROLES = [1540359821323149392, 1540495893399081061]
 
 # Role do ticketów
 OWNER_ROLES = [1540359821323149392, 1540495893399081061]
@@ -26,6 +29,11 @@ intents.members = True
 intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
+
+# Funkcja pomocnicza do sprawdzania czy użytkownik ma wymaganą rolę
+def has_allowed_role(user: discord.Member) -> bool:
+    user_role_ids = [role.id for role in user.roles]
+    return any(role_id in ALLOWED_COMMAND_ROLES for role_id in user_role_ids)
 
 # --- PRZYCISK ZAMYKANIA TICKETA ---
 class CloseTicketView(discord.ui.View):
@@ -48,37 +56,32 @@ class TicketSelect(discord.ui.Select):
     def __init__(self):
         options = [
             discord.SelectOption(
-                label="Owner",
-                description="ticket with a matter for the config owners",
-                emoji="👑",
+                label="Ticket Owner",
+                description="Open if you have a demand to the owners",
                 value="owner"
             ),
             discord.SelectOption(
-                label="Shop",
-                description="Ticket for purchase an item from our store",
-                emoji="🛒",
+                label="Ticket Shop",
+                description="open if you you want to buy something",
                 value="shop"
             ),
             discord.SelectOption(
-                label="Support",
-                description="Support ticket for help in our config server",
-                emoji="❓",
+                label="Ticket Support",
+                description="Open if you need any help",
                 value="support"
             ),
             discord.SelectOption(
-                label="Partner",
-                description="Ticket for partnership",
-                emoji="🤝",
+                label="Ticket Partner",
+                description="Open if you want to collaborate with us.",
                 value="partner"
             ),
             discord.SelectOption(
-                label="Recruitment",
-                description="Ticket for joining the team",
-                emoji="📝",
+                label="Ticket Recruitment",
+                description="Open if you want to join our team",
                 value="recruitment"
             ),
         ]
-        super().__init__(placeholder="Wybierz kategorię ticketa...", min_values=1, max_values=1, options=options, custom_id="ticket_select_menu")
+        super().__init__(placeholder="➔ Select category...", min_values=1, max_values=1, options=options, custom_id="ticket_select_menu")
 
     async def callback(self, interaction: discord.Interaction):
         guild = interaction.guild
@@ -147,7 +150,7 @@ async def on_ready():
     except Exception as e:
         print(f"Błąd podczas synchronizacji komend: {e}")
 
-# Auto-rola + Powitanie
+# Auto-rola + Powitanie z bannerem
 @bot.event
 async def on_member_join(member: discord.Member):
     role = member.guild.get_role(AUTO_ROLE_ID)
@@ -169,7 +172,7 @@ async def on_member_join(member: discord.Member):
         embed.set_image(url=BANNER_URL)
         await welcome_channel.send(embed=embed)
 
-# System Boostów
+# Powiadomienia o Boostach
 @bot.event
 async def on_member_update(before: discord.Member, after: discord.Member):
     if len(before.roles) < len(after.roles):
@@ -187,9 +190,14 @@ async def on_member_update(before: discord.Member, after: discord.Member):
                 embed.set_image(url=BANNER_URL)
                 await boost_channel.send(embed=embed)
 
-# --- KOMENDY SLASH ---
+# --- KOMENDY SLASH Z WERYFIKACJĄ RÓL ---
+
+# Komenda /setup_tickets
 @bot.tree.command(name="setup_tickets", description="Wysyła panel ticketów na odpowiedni kanał")
 async def setup_tickets(interaction: discord.Interaction):
+    if not has_allowed_role(interaction.user):
+        return await interaction.response.send_message("Nie masz uprawnień do używania tej komendy!", ephemeral=True)
+
     if interaction.channel_id != SETUP_CMD_CHANNEL_ID:
         return await interaction.response.send_message(f"Tą komendę możesz wykonać tylko na kanale <#{SETUP_CMD_CHANNEL_ID}>!", ephemeral=True)
 
@@ -197,19 +205,37 @@ async def setup_tickets(interaction: discord.Interaction):
     if not target_channel:
         return await interaction.response.send_message("Nie znaleziono docelowego kanału ticketów!", ephemeral=True)
 
+    chat_channel = discord.utils.get(interaction.guild.text_channels, name="chat")
+    chat_mention = chat_channel.mention if chat_channel else "#chat"
+
     embed = discord.Embed(
-        title="SAVAGE × TICKETS",
-        description="Wybierz interesującą Cię kategorię z poniższego menu, aby otworzyć ticket.",
+        title="Tickets",
+        description=(
+            "│ **Ticket Owner**\n"
+            "*Open if you have a demand to the owners*\n\n"
+            "│ **Ticket Shop**\n"
+            "*open if you you want to buy something*\n\n"
+            "│ **Ticket Support**\n"
+            "*Open if you need any help*\n\n"
+            "│ **Ticket Partner**\n"
+            "*Open if you want to collaborate with us.*\n\n"
+            f"│ **For any issues, text on** {chat_mention}"
+        ),
         color=0x2b2d31
     )
     embed.set_image(url=BANNER_URL)
+    embed.set_footer(text="Savage")
     
     await target_channel.send(embed=embed, view=TicketView())
     await interaction.response.send_message(f"Pomyślnie wysłano panel ticketów na kanał {target_channel.mention}!", ephemeral=True)
 
+# Komenda /say
 @bot.tree.command(name="say", description="Wysyła ogłoszenie w formie estetycznego embeda")
 @app_commands.describe(wiadomosc="Treść wiadomości", kanal="Kanał na którym ma zostać wysłana wiadomość")
 async def say(interaction: discord.Interaction, wiadomosc: str, kanal: discord.TextChannel):
+    if not has_allowed_role(interaction.user):
+        return await interaction.response.send_message("Nie masz uprawnień do używania tej komendy!", ephemeral=True)
+
     embed = discord.Embed(
         title="SAVAGE × OGŁOSZENIE",
         description=wiadomosc,
@@ -219,9 +245,13 @@ async def say(interaction: discord.Interaction, wiadomosc: str, kanal: discord.T
     await kanal.send(embed=embed)
     await interaction.response.send_message(f"Wysłano wiadomość na kanał {kanal.mention}!", ephemeral=True)
 
+# Komenda /bandc
 @bot.tree.command(name="bandc", description="Baniuje użytkownika i czyści jego wiadomości")
 @app_commands.describe(user="Użytkownik do zbanowania", powod="Powód bana")
 async def bandc(interaction: discord.Interaction, user: discord.Member, powod: str = "Brak powodu"):
+    if not has_allowed_role(interaction.user):
+        return await interaction.response.send_message("Nie masz uprawnień do używania tej komendy!", ephemeral=True)
+
     await user.ban(reason=powod, delete_message_days=7)
     embed = discord.Embed(
         title="SAVAGE × BAN & CLEAR",
@@ -231,9 +261,13 @@ async def bandc(interaction: discord.Interaction, user: discord.Member, powod: s
     embed.set_image(url=BANNER_URL)
     await interaction.response.send_message(embed=embed)
 
+# Komenda /unbandc
 @bot.tree.command(name="unbandc", description="Odbanowuje użytkownika")
 @app_commands.describe(user_id="ID użytkownika do odbanowania", powod="Powód odbanowania")
 async def unbandc(interaction: discord.Interaction, user_id: str, powod: str = "Brak powodu"):
+    if not has_allowed_role(interaction.user):
+        return await interaction.response.send_message("Nie masz uprawnień do używania tej komendy!", ephemeral=True)
+
     try:
         user = await bot.fetch_user(int(user_id))
         await interaction.guild.unban(user, reason=powod)
