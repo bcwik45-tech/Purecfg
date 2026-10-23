@@ -5,7 +5,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 
-# --- PROSTY SERWER DLA RENDERA (ZEBY NIE ZAMYKAŁ APLIKACJI) ---
+# --- PROSTY SERWER HTTP DLA RENDERA ---
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -13,12 +13,17 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b"Bot is online!")
 
+    def do_HEAD(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'text/html')
+        self.end_headers()
+
 def run_web_server():
     port = int(os.environ.get("PORT", 8080))
     server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
     server.serve_forever()
 
-# Uruchomienie serwera www w osobnym wątku
+# Uruchomienie serwera w tle
 threading.Thread(target=run_web_server, daemon=True).start()
 
 # --- KONFIGURACJA ID I LINKÓW ---
