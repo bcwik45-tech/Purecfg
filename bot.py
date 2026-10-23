@@ -1,7 +1,25 @@
 import os
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 import discord
 from discord.ext import commands
 from discord import app_commands
+
+# --- PROSTY SERWER DLA RENDERA (ZEBY NIE ZAMYKAŁ APLIKACJI) ---
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'text/html')
+        self.end_headers()
+        self.wfile.write(b"Bot is online!")
+
+def run_web_server():
+    port = int(os.environ.get("PORT", 8080))
+    server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
+    server.serve_forever()
+
+# Uruchomienie serwera www w osobnym wątku
+threading.Thread(target=run_web_server, daemon=True).start()
 
 # --- KONFIGURACJA ID I LINKÓW ---
 BANNER_URL = "https://cdn.discordapp.com/attachments/1563303323539476520/1563303364106649620/savage_hallowen.jpg?ex=6add2336&is=6adbd1b6&hm=83cd3b66fa3da205eb25fef7fe2d6866d35a92f367982641f9343d95d6b00cdf&"
@@ -178,7 +196,7 @@ async def on_member_update(before: discord.Member, after: discord.Member):
                 embed.set_image(url=BANNER_URL)
                 await boost_channel.send(embed=embed)
 
-# --- KOMENDY SLASH Z WERYFIKACJĄ RÓL ---
+# --- KOMENDY SLASH ---
 
 @bot.tree.command(name="setup_tickets", description="Wysyła panel ticketów na odpowiedni kanał")
 async def setup_tickets(interaction: discord.Interaction):
