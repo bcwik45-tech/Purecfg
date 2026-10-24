@@ -9,13 +9,13 @@ from discord import app_commands
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
-        self.send_header('Content-type', 'text/html')
+        self.send_header('Content-type', 'text/plain')
         self.end_headers()
-        self.wfile.write(b"Bot is online!")
+        self.wfile.write(b"OK")
 
     def do_HEAD(self):
         self.send_response(200)
-        self.send_header('Content-type', 'text/html')
+        self.send_header('Content-type', 'text/plain')
         self.end_headers()
 
 def run_web_server():
@@ -23,7 +23,7 @@ def run_web_server():
     server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
     server.serve_forever()
 
-# Uruchomienie serwera w tle
+# Uruchomienie serwera w osobnym wątku
 threading.Thread(target=run_web_server, daemon=True).start()
 
 # --- KONFIGURACJA ID I LINKÓW ---
