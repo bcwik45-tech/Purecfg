@@ -5,7 +5,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 
-# --- PROSTY SERWER HTTP DLA RENDERA ---
+# --- SERWER HTTP DLA RENDERA ---
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -23,7 +23,6 @@ def run_web_server():
     server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
     server.serve_forever()
 
-# Uruchomienie serwera w osobnym wątku
 threading.Thread(target=run_web_server, daemon=True).start()
 
 # --- KONFIGURACJA ID I LINKÓW ---
@@ -35,13 +34,18 @@ TICKET_PANEL_CHANNEL_ID = 1561742350986903702
 WELCOME_CHANNEL_ID = 1561740336726937660
 BOOST_CHANNEL_ID = 1563296339847282771
 
+# ID KATEGORII TICKETÓW
+CATEGORY_OWNER_ID = 1563539435507683509
+CATEGORY_RECRUITMENT_ID = 1563539309120847963
+CATEGORY_PARTNER_ID = 1563539138073075795
+
 # Rola startowa dla nowych osób
 AUTO_ROLE_ID = 1540360249775493230
 
 # Role z uprawnieniami do komend (/setup_tickets, /say, /bandc, /unbandc)
 ALLOWED_COMMAND_ROLES = [1540359821323149392, 1540495893399081061]
 
-# Role do ticketów
+# Role w ticketach
 OWNER_ROLES = [1540359821323149392, 1540495893399081061]
 PARTNER_ROLES = [1540359821323149392, 1540495893399081061]
 RECRUITMENT_ROLES = [1540359905175801946]
@@ -106,16 +110,22 @@ class TicketSelect(discord.ui.Select):
         
         ping_roles = []
         emoji_prefix = "🎫"
+        target_category_id = None
 
         if category_name == "owner":
             ping_roles = OWNER_ROLES
             emoji_prefix = "👑"
+            target_category_id = CATEGORY_OWNER_ID
         elif category_name == "partner":
             ping_roles = PARTNER_ROLES
             emoji_prefix = "🤝"
+            target_category_id = CATEGORY_PARTNER_ID
         elif category_name == "recruitment":
             ping_roles = RECRUITMENT_ROLES
             emoji_prefix = "📝"
+            target_category_id = CATEGORY_RECRUITMENT_ID
+
+        category = guild.get_channel(target_category_id) if target_category_id else None
 
         channel_name = f"{emoji_prefix}・ticket-{interaction.user.name}"
         
@@ -130,13 +140,17 @@ class TicketSelect(discord.ui.Select):
             if role:
                 overwrites[role] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
 
-        ticket_channel = await guild.create_text_channel(name=channel_name, overwrites=overwrites)
+        ticket_channel = await guild.create_text_channel(
+            name=channel_name, 
+            category=category, 
+            overwrites=overwrites
+        )
 
         pings_formatted = " ".join([f"<@&{r_id}>" for r_id in ping_roles])
         
         embed = discord.Embed(
             title=f"SAVAGE × {category_name.upper()}",
-            description="Cześć witaj w savage opisz swoją sytuację",
+            description="Cześć! Witaj w SAVAGE, opisz dokładnie swoją sytuację, a nasza administracja wkrótce Ci pomoże.",
             color=0x2b2d31
         )
         embed.set_image(url=BANNER_URL)
@@ -221,11 +235,11 @@ async def setup_tickets(interaction: discord.Interaction):
     embed = discord.Embed(
         title="Tickets",
         description=(
-            "│ **Ticket Owner**\n"
+            "│ 👑 **Ticket Owner**\n"
             "*Open if you have a demand to the owners*\n\n"
-            "│ **Ticket Partner**\n"
+            "│ 🤝 **Ticket Partner**\n"
             "*Open if you want to collaborate with us.*\n\n"
-            "│ **Ticket Recruitment**\n"
+            "│ 📝 **Ticket Recruitment**\n"
             "*Open if you want to join our team*\n\n"
             f"│ **For any issues, text on** {chat_mention}"
         ),
