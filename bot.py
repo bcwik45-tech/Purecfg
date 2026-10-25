@@ -200,13 +200,7 @@ class GlobalInfoSelect(discord.ui.Select):
             view = RulesLangView()
             embed = discord.Embed(
                 title="📄 ｜ REGULAMIN SERWERA",
-                description="""Nieznajomość regulaminu nie zwalnia Cię z jego przestrzegania. Dołączając na serwer, akceptujesz wszystkie poniższe zasady.
-
-**Regulamin Ogólny:**
-1. Nie tolerujemy wyzwisk, leaków ani innych działań uprzykrzających życie osobom na naszym lub innych serwerach. Publikowanie takich informacji skutkuje BANEM.
-2. Głupie pytania połączone z ciągłym oznaczaniem (pingu) administracji skutkować będą przerwą/mutem.
-3. Należy przestrzegać regulaminu Discord TOS.
-4. Publikowanie podejrzanych linków na kanałach pisemnych będzie karana BANEM.""",
+                description="Nieznajomość regulaminu nie zwalnia Cię z jego przestrzegania. Dołączając na serwer, akceptujesz wszystkie poniższe zasady.\n\n**Regulamin Ogólny:**\n1. Nie tolerujemy wyzwisk, leaków ani innych działań uprzykrzających życie osobom na naszym lub innych serwerach. Publikowanie takich informacji skutkuje BANEM.\n2. Głupie pytania połączone z ciągłym oznaczaniem (pingu) administracji skutkować będą przerwą/mutem.\n3. Należy przestrzegać regulaminu Discord TOS.\n4. Publikowanie podejrzanych linków na kanałach pisemnych będzie karana BANEM.",
                 color=0x2b2d31
             )
             embed.set_image(url=BANNER_URL)
@@ -265,14 +259,30 @@ class RulesLangView(discord.ui.View):
         if self.is_polish:
             button.label = "English 🇬🇧"
             embed.title = "📄 ｜ REGULAMIN SERWERA"
-            embed.description = """Nieznajomość regulaminu nie zwalnia Cię z jego przestrzegania. Dołączając na serwer, akceptujesz wszystkie poniższe zasady.
-
-**Regulamin Ogólny:**
-1. Nie tolerujemy wyzwisk, leaków ani innych działań uprzykrzających życie osobom na naszym lub innych serwerach. Publikowanie takich informacji skutkuje BANEM.
-2. Głupie pytania połączone z ciągłym oznaczaniem (pingu) administracji skutkować będą przerwą/mutem.
-3. Należy przestrzegać regulaminu Discord TOS.
-4. Publikowanie podejrzanych linków na kanałach pisemnych będzie karana BANEM."""
+            embed.description = "Nieznajomość regulaminu nie zwalnia Cię z jego przestrzegania. Dołączając na serwer, akceptujesz wszystkie poniższe zasady.\n\n**Regulamin Ogólny:**\n1. Nie tolerujemy wyzwisk, leaków ani innych działań uprzykrzających życie osobom na naszym lub innych serwerach. Publikowanie takich informacji skutkuje BANEM.\n2. Głupie pytania połączone z ciągłym oznaczaniem (pingu) administracji skutkować będą przerwą/mutem.\n3. Należy przestrzegać regulaminu Discord TOS.\n4. Publikowanie podejrzanych linków na kanałach pisemnych będzie karana BANEM."
         else:
             button.label = "Polski 🇵🇱"
             embed.title = "📄 ｜ SERVER RULES (EN)"
-            embed.description = """Ignorance
+            embed.description = "Ignorance of the rules does not exempt you from following them. By joining the server, you accept the following terms.\n\n**General Rules:**\n1. We do not tolerate insults, leaks, or any behavior that makes life difficult for people on our or other Discord servers. Posting such information results in a BAN.\n2. Stupid questions combined with constant pinging will result in a timeout/mute.\n3. You must abide by the Discord TOS.\n4. Posting suspicious links in text channels will result in a BAN."
+
+        await interaction.response.edit_message(embed=embed, view=self)
+
+class PartnershipLangView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=180)
+        self.is_polish = True
+
+    @discord.ui.button(label="English 🇬🇧", style=discord.ButtonStyle.secondary, custom_id="toggle_part_lang")
+    async def toggle_lang(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.is_polish = not self.is_polish
+        embed = discord.Embed(color=0x2b2d31)
+        embed.set_image(url=BANNER_URL)
+
+        if self.is_polish:
+            button.label = "English 🇬🇧"
+            embed.title = "🤝 ｜ Jak nawiązać z nami partnerstwo?"
+            embed.description = "• Wystarczy posiadać discorda na którym jest minimalnie 1000 osób.\n\n• Otwórz ticket i na pewno się dogadamy. Nie nawiązujemy partnerstw ze sklepami."
+        else:
+            button.label = "Polski 🇵🇱"
+            embed.title = "🤝 ｜ How to partner with us?"
+            embed.description = "
