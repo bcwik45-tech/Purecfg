@@ -90,3 +90,109 @@ class TicketSelect(discord.ui.Select):
             ),
             discord.SelectOption(
                 label="Ticket Partner",
+                description="Open if you want to collaborate with us.",
+                emoji="🤝",
+                value="partner"
+            ),
+            discord.SelectOption(
+                label="Ticket Recruitment",
+                description="Open if you want to join our team",
+                emoji="📝",
+                value="recruitment"
+            )
+        ]
+        super().__init__(placeholder="➔ Select category...", min_values=1, max_values=1, options=options, custom_id="ticket_select_menu")
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+
+        guild = interaction.guild
+        category_name = self.values[0]
+        
+        ping_roles = []
+        emoji_prefix = "🎫"
+        target_category_id = None
+
+        if category_name == "owner":
+            ping_roles = OWNER_ROLES
+            emoji_prefix = "👑"
+            target_category_id = CATEGORY_OWNER_ID
+        elif category_name == "partner":
+            ping_roles = PARTNER_ROLES
+            emoji_prefix = "🤝"
+            target_category_id = CATEGORY_PARTNER_ID
+        elif category_name == "recruitment":
+            ping_roles = RECRUITMENT_ROLES
+            emoji_prefix = "📝"
+            target_category_id = CATEGORY_RECRUITMENT_ID
+
+        category = guild.get_channel(target_category_id) if target_category_id else None
+        channel_name = f"{emoji_prefix}・ticket-{interaction.user.name}"
+        
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(read_messages=False),
+            interaction.user: discord.PermissionOverwrite(read_messages=True, send_messages=True),
+            guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True)
+        }
+
+        for r_id in ping_roles:
+            role = guild.get_role(r_id)
+            if role:
+                overwrites[role] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
+
+        ticket_channel = await guild.create_text_channel(
+            name=channel_name, 
+            category=category, 
+            overwrites=overwrites
+        )
+
+        pings_formatted = " ".join([f"<@&{r_id}>" for r_id in ping_roles])
+        
+        embed = discord.Embed(
+            title=f"SAVAGE × {category_name.upper()}",
+            description="Cześć! Witaj w SAVAGE, opisz dokładnie swoją sytuację, a nasza administracja wkrótce Ci pomoże.",
+            color=0x2b2d31
+        )
+        embed.set_image(url=BANNER_URL)
+
+        await ticket_channel.send(content=f"{interaction.user.mention} {pings_formatted}", embed=embed, view=CloseTicketView())
+        await interaction.followup.send(f"Stworzono ticket: {ticket_channel.mention}", ephemeral=True)
+
+class TicketView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(TicketSelect())
+
+# --- GLOBAL INFO / FAQ SELECT MENU ---
+class GlobalInfoSelect(discord.ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(
+                label="Regulamin | Statute",
+                description="Przeczytaj zasady panujące na serwerze. | Read rules.",
+                emoji="📄",
+                value="rules"
+            ),
+            discord.SelectOption(
+                label="FAQ",
+                description="Najczęściej zadawane pytania. | Frequently asked questions.",
+                emoji="❓",
+                value="faq"
+            ),
+            discord.SelectOption(
+                label="Information Partnership",
+                description="Information Partnership rules.",
+                emoji="🤝",
+                value="partnership"
+            )
+        ]
+        super().__init__(placeholder="! | Select the section that interests you", min_values=1, max_values=1, options=options, custom_id="global_info_select")
+
+    async def callback(self, interaction: discord.Interaction):
+        val = self.values[0]
+
+        if val == "rules":
+            view = RulesLangView()
+            embed = discord.Embed(
+                title="📄 ｜ REGULAMIN SERWERA",
+                description="Nieznajomość regulaminu nie zwalnia Cię z jego przestrzegania. Dołączając na serwer, akceptujesz wszystkie poniższe zasady.\n\n**Regulamin Ogólny:**\n1. Nie tolerujemy wyzwisk, leaków ani innych działań
