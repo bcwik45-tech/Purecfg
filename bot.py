@@ -30,7 +30,7 @@ def run_web_server():
 threading.Thread(target=run_web_server, daemon=True).start()
 
 # --- KONFIGURACJA ID I LINKÓW ---
-BANNER_URL = "https://cdn.discordapp.com/attachments/1563303323539476520/1563889238045626438/bannercvg.jpg?ex=6adf44da&is=6addf35a&hm=3d9fa13ed9b59f3341beef572ff7113b50f0ba1024eeb0e5643c98b17bc9153a&"
+BANNER_URL = "https://cdn.discordapp.com/attachments/1563303323539476520/1563898914002968606/bannersvgteam.jpg?ex=6adf4ddc&is=6addfc5c&hm=a318b28667983d713c7e41c62754e2f63b38751271364975036cb61f1f01fedc&"
 
 # Kanały
 SETUP_CMD_CHANNEL_ID = 1561758533446410251
@@ -207,8 +207,8 @@ class GlobalInfoSelect(discord.ui.Select):
             await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
         elif val == "faq":
-            ticket_chan = discord.utils.get(interaction.guild.text_channels, name="ticket") or discord.utils.get(interaction.guild.text_channels, name="🛒・ticket")
-            ticket_mention = ticket_chan.mention if ticket_chan else "#🛒・ticket"
+            target_chan_faq = interaction.guild.get_channel(1561742350986903702)
+            ticket_mention = target_chan_faq.mention if target_chan_faq else "<#1561742350986903702>"
             tracked_chan = interaction.guild.get_channel(TRACKED_CHANNEL_ID)
             tracked_mention = tracked_chan.mention if tracked_chan else f"<#{TRACKED_CHANNEL_ID}>"
 
@@ -222,7 +222,7 @@ class GlobalInfoSelect(discord.ui.Select):
                     f"• **Jak dostać się do administracji?**\n"
                     f"• obserwuj kanał {tracked_mention}\n\n"
                     f"• **Czy transakcje są w pełni anonimowe?**\n"
-                    f"• Tak! Wgląd do ticketów mają tylko osoby z rangą OWNER, co zapewnia wam 100% ochrony danych."
+                    f"• Tak! Wgląd do ticketów mają tylko osoby z rangą FOUNDER + OWNER, co zapewnia wam 100% ochrony danych."
                 ),
                 color=0x2b2d31
             )
