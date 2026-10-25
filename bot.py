@@ -26,13 +26,15 @@ def run_web_server():
 threading.Thread(target=run_web_server, daemon=True).start()
 
 # --- KONFIGURACJA ID I LINKÓW ---
-BANNER_URL = "https://cdn.discordapp.com/attachments/1563303323539476520/1563303364106649620/savage_hallowen.jpg?ex=6add2336&is=6adbd1b6&hm=83cd3b66fa3da205eb25fef7fe2d6866d35a92f367982641f9343d95d6b00cdf&"
+BANNER_URL = "https://cdn.discordapp.com/attachments/1563303323539476520/1563889238045626438/bannercvg.jpg?ex=6adf44da&is=6addf35a&hm=3d9fa13ed9b59f3341beef572ff7113b50f0ba1024eeb0e5643c98b17bc9153a&"
 
 # Kanały
 SETUP_CMD_CHANNEL_ID = 1561758533446410251
 TICKET_PANEL_CHANNEL_ID = 1561742350986903702
 WELCOME_CHANNEL_ID = 1561740336726937660
 BOOST_CHANNEL_ID = 1563296339847282771
+FAQ_CHANNEL_ID = 1561758533446410251 # Kanał na którym stawiamy panel FAQ (lub podaj inny)
+TRACKED_CHANNEL_ID = 1563295322669711471 # Kanał śledzony w FAQ
 
 # ID KATEGORII TICKETÓW
 CATEGORY_OWNER_ID = 1563539435507683509
@@ -42,7 +44,7 @@ CATEGORY_PARTNER_ID = 1563539138073075795
 # Rola startowa dla nowych osób
 AUTO_ROLE_ID = 1540360249775493230
 
-# Role z uprawnieniami do komend (/setup_tickets, /say, /bandc, /unbandc)
+# Role z uprawnieniami do komend
 ALLOWED_COMMAND_ROLES = [1540359821323149392, 1540495893399081061]
 
 # Role w ticketach
@@ -126,7 +128,6 @@ class TicketSelect(discord.ui.Select):
             target_category_id = CATEGORY_RECRUITMENT_ID
 
         category = guild.get_channel(target_category_id) if target_category_id else None
-
         channel_name = f"{emoji_prefix}・ticket-{interaction.user.name}"
         
         overwrites = {
@@ -163,146 +164,49 @@ class TicketView(discord.ui.View):
         super().__init__(timeout=None)
         self.add_item(TicketSelect())
 
-# --- EVENTY BOTA ---
-@bot.event
-async def on_ready():
-    print(f"Zalogowano jako {bot.user}")
-    bot.add_view(TicketView())
-    bot.add_view(CloseTicketView())
-    try:
-        synced = await bot.tree.sync()
-        print(f"Zsynchronizowano {len(synced)} komend slash")
-    except Exception as e:
-        print(f"Błąd synchronizacji: {e}")
+# --- GLOBAL INFO / FAQ SELECT MENU ---
+class GlobalInfoSelect(discord.ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(
+                label="Regulamin | Statute",
+                description="Przeczytaj zasady panujące na serwerze. | Read rules.",
+                emoji="📄",
+                value="rules"
+            ),
+            discord.SelectOption(
+                label="FAQ",
+                description="Najczęściej zadawane pytania. | Frequently asked questions.",
+                emoji="❓",
+                value="faq"
+            ),
+            discord.SelectOption(
+                label="Information Partnership",
+                description="Information Partnership rules.",
+                emoji="🤝",
+                value="partnership"
+            ),
+        ]
+        super().__init__(placeholder="! | Select the section that interests you", min_values=1, max_values=1, options=options, custom_id="global_info_select")
 
-# Auto-rola + Powitanie z bannerem
-@bot.event
-async def on_member_join(member: discord.Member):
-    role = member.guild.get_role(AUTO_ROLE_ID)
-    if role:
-        try:
-            await member.add_roles(role)
-        except Exception as e:
-            print(f"Błąd przy nadawania roli: {e}")
+    async def callback(self, interaction: discord.Interaction):
+        val = self.values[0]
 
-    welcome_channel = member.guild.get_channel(WELCOME_CHANNEL_ID)
-    if welcome_channel:
-        embed = discord.Embed(
-            title="SAVAGE × NOWA OSOBA",
-            description=f"➥ | Witaj {member.mention} na **SAVAGE**!\n❤ | Mamy nadzieję, że zostaniesz z nami na dłużej\n\n⚠ | Nieprzestrzeganie naszego **regulaminu** może wiązać się z karą",
-            color=0x2b2d31
-        )
-        embed.set_thumbnail(url=member.display_avatar.url)
-        embed.add_field(name="", value=f"👤 | Jesteś naszym **{member.guild.member_count}** użytkownikiem!", inline=False)
-        embed.set_image(url=BANNER_URL)
-        await welcome_channel.send(embed=embed)
+        if val == "rules":
+            view = RulesLangView()
+            embed = discord.Embed(
+                title="📄 ｜ REGULAMIN SERWERA",
+                description="Nieznajomość regulaminu nie zwalnia Cię z jego przestrzegania. Dołączając na serwer, akceptujesz wszystkie poniższe zasady.\n\n**Regulamin Ogólny:**\n1. Nie tolerujemy wyzwisk, leaków ani innych działań uprzykrzających życie osobom na naszym lub innych serwerach. Publikowanie takich informacji skutkuje BANEM.\n2. Głupie pytania połączone z ciągłym oznaczaniem (pingu) administracji skutkować będą przerwą/mutem.\n3. Należy przestrzegać regulaminu Discord TOS.\n4. Publikowanie podejrzanych linków na kanałach pisemnych będzie karana BANEM.",
+                color=0x2b2d31
+            )
+            embed.set_image(url=BANNER_URL)
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
-# Powiadomienia o Boostach
-@bot.event
-async def on_member_update(before: discord.Member, after: discord.Member):
-    if len(before.roles) < len(after.roles):
-        premium_role = after.guild.premium_subscriber_role
-        if premium_role and premium_role not in before.roles and premium_role in after.roles:
-            boost_channel = after.guild.get_channel(BOOST_CHANNEL_ID)
-            if boost_channel:
-                embed = discord.Embed(
-                    title="💎 New server Boost!",
-                    description=f"{after.mention} **BOOST!**\nthanks for boosting our server!\nGo check out our booster zone!",
-                    color=0x2b2d31
-                )
-                embed.set_thumbnail(url=after.display_avatar.url)
-                embed.add_field(name="Boost Info:", value=f"🧊 **Server Boost level:** {after.guild.premium_tier}\n🔢 **Boost count:** {after.guild.premium_subscription_count}", inline=False)
-                embed.set_image(url=BANNER_URL)
-                await boost_channel.send(embed=embed)
+        elif val == "faq":
+            ticket_chan = discord.utils.get(interaction.guild.text_channels, name="ticket") or discord.utils.get(interaction.guild.text_channels, name="🛒・ticket")
+            ticket_mention = ticket_chan.mention if ticket_chan else "#🛒・ticket"
+            tracked_chan = interaction.guild.get_channel(TRACKED_CHANNEL_ID)
+            tracked_mention = tracked_chan.mention if tracked_chan else f"<#{TRACKED_CHANNEL_ID}>"
 
-# --- KOMENDY SLASH ---
-
-@bot.tree.command(name="setup_tickets", description="Wysyła panel ticketów na odpowiedni kanał")
-async def setup_tickets(interaction: discord.Interaction):
-    if not has_allowed_role(interaction.user):
-        return await interaction.response.send_message("Nie masz uprawnień do używania tej komendy!", ephemeral=True)
-
-    if interaction.channel_id != SETUP_CMD_CHANNEL_ID:
-        return await interaction.response.send_message(f"Tą komendę możesz wykonać tylko na kanale <#{SETUP_CMD_CHANNEL_ID}>!", ephemeral=True)
-
-    target_channel = interaction.guild.get_channel(TICKET_PANEL_CHANNEL_ID)
-    if not target_channel:
-        return await interaction.response.send_message("Nie znaleziono docelowego kanału ticketów!", ephemeral=True)
-
-    chat_channel = discord.utils.get(interaction.guild.text_channels, name="chat")
-    chat_mention = chat_channel.mention if chat_channel else "#chat"
-
-    embed = discord.Embed(
-        title="Tickets",
-        description=(
-            "│ 👑 **Ticket Owner**\n"
-            "*Open if you have a demand to the owners*\n\n"
-            "│ 🤝 **Ticket Partner**\n"
-            "*Open if you want to collaborate with us.*\n\n"
-            "│ 📝 **Ticket Recruitment**\n"
-            "*Open if you want to join our team*\n\n"
-            f"│ **For any issues, text on** {chat_mention}"
-        ),
-        color=0x2b2d31
-    )
-    embed.set_image(url=BANNER_URL)
-    embed.set_footer(text="Savage")
-    
-    await target_channel.send(embed=embed, view=TicketView())
-    await interaction.response.send_message(f"Pomyślnie wysłano panel ticketów na kanał {target_channel.mention}!", ephemeral=True)
-
-@bot.tree.command(name="say", description="Wysyła ogłoszenie w formie estetycznego embeda")
-@app_commands.describe(wiadomosc="Treść wiadomości", kanal="Kanał na którym ma zostać wysłana wiadomość")
-async def say(interaction: discord.Interaction, wiadomosc: str, kanal: discord.TextChannel):
-    if not has_allowed_role(interaction.user):
-        return await interaction.response.send_message("Nie masz uprawnień do używania tej komendy!", ephemeral=True)
-
-    embed = discord.Embed(
-        title="SAVAGE × OGŁOSZENIE",
-        description=wiadomosc,
-        color=0x2b2d31
-    )
-    embed.set_image(url=BANNER_URL)
-    await kanal.send(embed=embed)
-    await interaction.response.send_message(f"Wysłano wiadomość na kanał {kanal.mention}!", ephemeral=True)
-
-@bot.tree.command(name="bandc", description="Baniuje użytkownika i czyści jego wiadomości")
-@app_commands.describe(user="Użytkownik do zbanowania", powod="Powód bana")
-async def bandc(interaction: discord.Interaction, user: discord.Member, powod: str = "Brak powodu"):
-    if not has_allowed_role(interaction.user):
-        return await interaction.response.send_message("Nie masz uprawnień do używania tej komendy!", ephemeral=True)
-
-    await user.ban(reason=powod, delete_message_days=7)
-    embed = discord.Embed(
-        title="SAVAGE × BAN & CLEAR",
-        description=f"Użytkownik {user.mention} został zbanowany, a jego wiadomości wyczyszczone.\n**Powód:** {powod}",
-        color=0x2b2d31
-    )
-    embed.set_image(url=BANNER_URL)
-    await interaction.response.send_message(embed=embed)
-
-@bot.tree.command(name="unbandc", description="Odbanowuje użytkownika")
-@app_commands.describe(user_id="ID użytkownika do odbanowania", powod="Powód odbanowania")
-async def unbandc(interaction: discord.Interaction, user_id: str, powod: str = "Brak powodu"):
-    if not has_allowed_role(interaction.user):
-        return await interaction.response.send_message("Nie masz uprawnień do używania tej komendy!", ephemeral=True)
-
-    try:
-        user = await bot.fetch_user(int(user_id))
-        await interaction.guild.unban(user, reason=powod)
-        embed = discord.Embed(
-            title="SAVAGE × UNBAN",
-            description=f"Użytkownik **{user.name}** (`{user.id}`) został odbanowany.\n**Powód:** {powod}",
-            color=0x2b2d31
-        )
-        embed.set_image(url=BANNER_URL)
-        await interaction.response.send_message(embed=embed)
-    except Exception as e:
-        await interaction.response.send_message(f"Nie udało się odbanować użytkownika. Błąd: {e}", ephemeral=True)
-
-TOKEN = os.getenv("DISCORD_TOKEN")
-
-if TOKEN:
-    bot.run(TOKEN)
-else:
-    print("CRITICAL ERROR: Brak zmiennej środowiskowej DISCORD_TOKEN!")
+            embed = discord.Embed(
+                title="❓
