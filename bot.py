@@ -189,10 +189,4 @@ class GlobalInfoSelect(discord.ui.Select):
         super().__init__(placeholder="! | Select the section that interests you", min_values=1, max_values=1, options=options, custom_id="global_info_select")
 
     async def callback(self, interaction: discord.Interaction):
-        val = self.values[0]
-
-        if val == "rules":
-            view = RulesLangView()
-            embed = discord.Embed(
-                title="📄 ｜ REGULAMIN SERWERA",
-                description="Nieznajomość regulaminu nie zwalnia Cię z jego przestrzegania. Dołączając na serwer, akceptujesz wszystkie poniższe zasady.\n\n**Regulamin Ogólny:**\n1. Nie tolerujemy wyzwisk, leaków ani innych działań
+        val = self.values
