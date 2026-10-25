@@ -5,7 +5,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 
-# --- SERWER HTTP DLA RENDERA ---
+# --- SERWER HTTP DLA RENDERA (24/7 UPTIMEROBOT) ---
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -17,10 +17,14 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Content-type', 'text/plain')
         self.end_headers()
+        
+    def log_message(self, format, *args):
+        return # Wycisza spam logów HTTP
 
 def run_web_server():
-    port = int(os.environ.get("PORT", 8080))
+    port = int(os.environ.get("PORT", 10000))
     server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
+    print(f"Uruchomiono serwer HTTP na porcie {port}")
     server.serve_forever()
 
 threading.Thread(target=run_web_server, daemon=True).start()
@@ -189,4 +193,49 @@ class GlobalInfoSelect(discord.ui.Select):
         super().__init__(placeholder="! | Select the section that interests you", min_values=1, max_values=1, options=options, custom_id="global_info_select")
 
     async def callback(self, interaction: discord.Interaction):
-        val = self.values
+        val = self.values[0]
+
+        if val == "rules":
+            view = RulesLangView()
+            embed = discord.Embed(
+                title="📄 ｜ REGULAMIN SERWERA",
+                description="""Nieznajomość regulaminu nie zwalnia Cię z jego przestrzegania. Dołączając na serwer, akceptujesz wszystkie poniższe zasady.
+
+**Regulamin Ogólny:**
+1. Nie tolerujemy wyzwisk, leaków ani innych działań uprzykrzających życie osobom na naszym lub innych serwerach. Publikowanie takich informacji skutkuje BANEM.
+2. Głupie pytania połączone z ciągłym oznaczaniem (pingu) administracji skutkować będą przerwą/mutem.
+3. Należy przestrzegać regulaminu Discord TOS.
+4. Publikowanie podejrzanych linków na kanałach pisemnych będzie karana BANEM.""",
+                color=0x2b2d31
+            )
+            embed.set_image(url=BANNER_URL)
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+        elif val == "faq":
+            ticket_chan = discord.utils.get(interaction.guild.text_channels, name="ticket") or discord.utils.get(interaction.guild.text_channels, name="🛒・ticket")
+            ticket_mention = ticket_chan.mention if ticket_chan else "#🛒・ticket"
+            tracked_chan = interaction.guild.get_channel(TRACKED_CHANNEL_ID)
+            tracked_mention = tracked_chan.mention if tracked_chan else f"<#{TRACKED_CHANNEL_ID}>"
+
+            embed = discord.Embed(
+                title="❓ ｜ FAQ",
+                description=(
+                    f"• **Gdzie mogę zakupić coś z waszego sklepu?**\n"
+                    f"• **Tickety** - {ticket_mention}\n\n"
+                    f"• **Gdzie znajde tickety związane z supportem?**\n"
+                    f"• znajdziesz je na kanale {ticket_mention}\n\n"
+                    f"• **Jak dostać się do administracji?**\n"
+                    f"• obserwuj kanał {tracked_mention}\n\n"
+                    f"• **Czy transakcje są w pełni anonimowe?**\n"
+                    f"• Tak! Wgląd do ticketów mają tylko osoby z rangą OWNER, co zapewnia wam 100% ochrony danych."
+                ),
+                color=0x2b2d31
+            )
+            embed.set_image(url=BANNER_URL)
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        elif val == "partnership":
+            view = PartnershipLangView()
+            embed = discord.Embed(
+                title="🤝 ｜ Jak nawiązać z nami partnerstwo?",
+                description="• Wystarczy posiadać discorda na którym jest minimalnie 1000 osób.\n\n• Otwórz ticket i na pewno się dogadamy. Nie nawiązujemy partnerstw ze sklepami.",
