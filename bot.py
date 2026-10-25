@@ -254,4 +254,20 @@ async def setup_tickets(interaction: discord.Interaction):
     await interaction.response.send_message(f"Pomyślnie wysłano panel ticketów na kanał {target_channel.mention}!", ephemeral=True)
 
 @bot.tree.command(name="say", description="Wysyła ogłoszenie w formie estetycznego embeda")
-@app_commands.describe(wiadomosc="Treść wiadomości", kanal="Kanał na którym ma zostać wysłana wiadomo
+@app_commands.describe(wiadomosc="Tresc wiadomosci", kanal="Kanal na ktorym ma zostac wyslana wiadomosc")
+async def say(interaction: discord.Interaction, wiadomosc: str, kanal: discord.TextChannel):
+    if not has_allowed_role(interaction.user):
+        return await interaction.response.send_message("Nie masz uprawnień do używania tej komendy!", ephemeral=True)
+
+    embed = discord.Embed(
+        title="SAVAGE × OGŁOSZENIE",
+        description=wiadomosc,
+        color=0x2b2d31
+    )
+    embed.set_image(url=BANNER_URL)
+    await kanal.send(embed=embed)
+    await interaction.response.send_message(f"Wysłano wiadomość na kanał {kanal.mention}!", ephemeral=True)
+
+@bot.tree.command(name="bandc", description="Baniuje użytkownika i czyści jego wiadomości")
+@app_commands.describe(user="Uzytkownik do zbanowania", powod="Powod bana")
+async def bandc(interaction:
