@@ -212,4 +212,100 @@ async def on_member_update(before: discord.Member, after: discord.Member):
                     description=f"{after.mention} **BOOST!**\nthanks for boosting our server!\nGo check out our booster zone!",
                     color=0x2b2d31
                 )
-                embed.set_thumbnail(
+                embed.set_thumbnail(url=after.display_avatar.url)
+                embed.add_field(
+                    name="Boost Info:", 
+                    value=f"🧊 **Server Boost level:** {after.guild.premium_tier}\n🔢 **Boost count:** {after.guild.premium_subscription_count}", 
+                    inline=False
+                )
+                embed.set_image(url=BANNER_URL)
+                await boost_channel.send(embed=embed)
+
+# --- KOMENDY SLASH ---
+
+@bot.tree.command(name="setup_tickets", description="Wysyła panel ticketów na odpowiedni kanał")
+async def setup_tickets(interaction: discord.Interaction):
+    if not has_allowed_role(interaction.user):
+        return await interaction.response.send_message("Nie masz uprawnień do używania tej komendy!", ephemeral=True)
+
+    if interaction.channel_id != SETUP_CMD_CHANNEL_ID:
+        return await interaction.response.send_message(f"Tą komendę możesz wykonać tylko na kanale <#{SETUP_CMD_CHANNEL_ID}>!", ephemeral=True)
+
+    target_channel = interaction.guild.get_channel(TICKET_PANEL_CHANNEL_ID)
+    if not target_channel:
+        return await interaction.response.send_message("Nie znaleziono docelowego kanału ticketów!", ephemeral=True)
+
+    chat_channel = discord.utils.get(interaction.guild.text_channels, name="chat")
+    chat_mention = chat_channel.mention if chat_channel else "#chat"
+
+    embed = discord.Embed(
+        title="Tickets",
+        description=(
+            "👑 | **Ticket Owner**\n"
+            "Open if you have a demand to the owners\n\n"
+            "🤝 | **Ticket Partner**\n"
+            "Open if you want to collaborate with us\n\n"
+            "📝 | **Ticket Recruitment**\n"
+            "Open if you want to join our team\n\n"
+            f"📌 | **For any issues, text on** {chat_mention}"
+        ),
+        color=0x2b2d31
+    )
+    embed.set_image(url=BANNER_URL)
+    embed.set_footer(text="Savage")
+    
+    await target_channel.send(embed=embed, view=TicketView())
+    await interaction.response.send_message(f"Pomyślnie wysłano panel ticketów na kanał {target_channel.mention}!", ephemeral=True)
+
+@bot.tree.command(name="say", description="Wysyła ogłoszenie")
+async def say(interaction: discord.Interaction, wiadomosc: str, kanal: discord.TextChannel):
+    if not has_allowed_role(interaction.user):
+        return await interaction.response.send_message("Nie masz uprawnień do używania tej komendy!", ephemeral=True)
+
+    embed = discord.Embed(
+        title="SAVAGE × OGŁOSZENIE",
+        description=wiadomosc,
+        color=0x2b2d31
+    )
+    embed.set_image(url=BANNER_URL)
+    await kanal.send(embed=embed)
+    await interaction.response.send_message(f"Wysłano wiadomość na kanał {kanal.mention}!", ephemeral=True)
+
+@bot.tree.command(name="bandc", description="Baniuje użytkownika i czyści jego wiadomości")
+async def bandc(interaction: discord.Interaction, user: discord.Member, powod: str = "Brak powodu"):
+    if not has_allowed_role(interaction.user):
+        return await interaction.response.send_message("Nie masz uprawnień do używania tej komendy!", ephemeral=True)
+
+    await user.ban(reason=powod, delete_message_days=7)
+    embed = discord.Embed(
+        title="SAVAGE × BAN & CLEAR",
+        description=f"Użytkownik {user.mention} został zbanowany, a jego wiadomości wyczyszczone.\n**Powód:** {powod}",
+        color=0x2b2d31
+    )
+    embed.set_image(url=BANNER_URL)
+    await interaction.response.send_message(embed=embed)
+
+@bot.tree.command(name="unbandc", description="Odbanowuje użytkownika")
+async def unbandc(interaction: discord.Interaction, user_id: str, powod: str = "Brak powodu"):
+    if not has_allowed_role(interaction.user):
+        return await interaction.response.send_message("Nie masz uprawnień do używania tej komendy!", ephemeral=True)
+
+    try:
+        user = await bot.fetch_user(int(user_id))
+        await interaction.guild.unban(user, reason=powod)
+        embed = discord.Embed(
+            title="SAVAGE × UNBAN",
+            description=f"Użytkownik **{user.name}** (`{user.id}`) został odbanowany.\n**Powód:** {powod}",
+            color=0x2b2d31
+        )
+        embed.set_image(url=BANNER_URL)
+        await interaction.response.send_message(embed=embed)
+    except Exception as e:
+        await interaction.response.send_message(f"Nie udało się odbanować użytkownika. Błąd: {e}", ephemeral=True)
+
+TOKEN = os.getenv("DISCORD_TOKEN")
+
+if TOKEN:
+    bot.run(TOKEN)
+else:
+    print("CRITICAL ERROR
