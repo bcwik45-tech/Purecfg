@@ -208,11 +208,3 @@ async def on_member_update(before: discord.Member, after: discord.Member):
             boost_channel = after.guild.get_channel(BOOST_CHANNEL_ID)
             if boost_channel:
                 embed = discord.Embed(
-                    title="💎 New server Boost!",
-                    description=f"{after.mention} **BOOST!**\nthanks for boosting our server!\nGo check out our booster zone!",
-                    color=0x2b2d31
-                )
-                embed.set_thumbnail(url=after.display_avatar.url)
-                embed.add_field(name="Boost Info:", value=f"🧊 **Server Boost level:** {after.guild.premium_tier}\n🔢 **Boost count:** {after.guild.premium_subscription_count}", inline=False)
-                embed.set_image(url=BANNER_URL)
-                await boost_channel.send(embed=embed
