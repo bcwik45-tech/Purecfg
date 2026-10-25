@@ -1,169 +1,137 @@
 import os
-import datetime
-import random
-from zoneinfo import ZoneInfo
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 import discord
-from discord.ext import commands, tasks
+from discord.ext import commands
 from discord import app_commands
 
-# --- KONFIGURACJA SAVAGE ---
-EMBED_COLOR = 0x2B2D31
-BANNER_URL = "https://cdn.discordapp.com/attachments/1563292364414648471/1563987942819762176/Gemini_Generated_Image_ksdzv8ksdzv8ksdz.jpg"
-FOOTER_TEXT = "Savage"
+# --- SERWER HTTP DLA RENDERA (24/7 UPTIMEROBOT) ---
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'text/plain')
+        self.end_headers()
+        self.wfile.write(b"OK")
 
-# --- ID KANAŁÓW I RÓL ---
+    def do_HEAD(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'text/plain')
+        self.end_headers()
+        
+    def log_message(self, format, *args):
+        return # Wycisza spam logów HTTP
+
+def run_web_server():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
+    print(f"Uruchomiono serwer HTTP na porcie {port}")
+    server.serve_forever()
+
+threading.Thread(target=run_web_server, daemon=True).start()
+
+# --- KONFIGURACJA ID I LINKÓW ---
+BANNER_URL = "https://cdn.discordapp.com/attachments/1563292364414648471/1563987942819762176/Gemini_Generated_Image_ksdzv8ksdzv8ksdz.jpg?ex=6adfa0c7&is=6ade4f47&hm=52883c137fcd791f1631549995304d8b0c97184ebe5e50e089fb282ed35e174b&"
+
+# Kanały
+SETUP_CMD_CHANNEL_ID = 1561758533446410251
+TICKET_PANEL_CHANNEL_ID = 1561742350986903702
 WELCOME_CHANNEL_ID = 1561740336726937660
 BOOST_CHANNEL_ID = 1563296339847282771
-TICKET_CHANNEL_ID = 1561742350986903702
-MINIGAME_CHANNEL_ID = 1562815793547182173
-ALLOWED_COMMAND_CHANNEL_ID = 1561758533446410251
+TRACKED_CHANNEL_ID = 1563295322669711471
 
+# ID KATEGORII TICKETÓW
+CATEGORY_OWNER_ID = 1563539435507683509
+CATEGORY_RECRUITMENT_ID = 1563539309120847963
+CATEGORY_PARTNER_ID = 1563539138073075795
+
+# Rola startowa dla nowych osób
 AUTO_ROLE_ID = 1540360249775493230
-MINIGAME_REWARD_ROLE_ID = 1562816846535729222
 
-# Konfiguracja ról i kategorii ticketów
-TICKET_CONFIGS = {
-    "Owner": {
-        "category_id": 1563539138073075795,
-        "allowed_roles": [1540359821323149392, 1540495893399081061],
-        "emoji": "👑",
-        "desc": "ticket with a matter for the config owners"
-    },
-    "Partner": {
-        "category_id": 1563539138073075795,
-        "allowed_roles": [1556315623045333064, 1540359905175801946, 1556062543963750400, 1540495893399081061, 1540359821323149392],
-        "emoji": "🤝",
-        "desc": "Ticket for partnership"
-    },
-    "Recruitment": {
-        "category_id": 1563539309120847963,
-        "allowed_roles": [1540359821323149392, 1540495893399081061],
-        "emoji": "📝",
-        "desc": "Open if you want to join our team"
-    }
-}
+# Role z uprawnieniami do komend
+ALLOWED_COMMAND_ROLES = [1540359821323149392, 1540495893399081061]
 
-minigame_cooldowns = {}
+# Role w ticketach
+OWNER_ROLES = [1540359821323149392, 1540495893399081061]
+PARTNER_ROLES = [1540359821323149392, 1540495893399081061]
+RECRUITMENT_ROLES = [1540359905175801946]
 
-class SavageBot(commands.Bot):
-    def __init__(self):
-        intents = discord.Intents.default()
-        intents.message_content = True
-        intents.members = True
-        super().__init__(command_prefix="!", intents=intents)
+# --- SETUP BOTA ---
+intents = discord.Intents.default()
+intents.members = True
+intents.message_content = True
 
-    async def setup_hook(self):
-        print("Synchronizacja komend slash...")
-        await self.tree.sync()
-        print("Komendy slash zsynchronizowane!")
-        daily_minigame_reminder.start()
-        reset_minigame_cooldowns.start()
+bot = commands.Bot(command_prefix="!", intents=intents)
 
-bot = SavageBot()
+def has_allowed_role(user: discord.Member) -> bool:
+    user_role_ids = [role.id for role in user.roles]
+    return any(role_id in ALLOWED_COMMAND_ROLES for role_id in user_role_ids)
 
-# --- ZDARZENIE: WEJŚCIE UŻYTKOWNIKA ---
-@bot.event
-async def on_member_join(member: discord.Member):
-    role = member.guild.get_role(AUTO_ROLE_ID)
-    if role:
-        try:
-            await member.add_roles(role)
-        except Exception:
-            pass
-
-    channel = member.guild.get_channel(WELCOME_CHANNEL_ID)
-    if channel:
-        member_count = member.guild.member_count
-        embed = discord.Embed(
-            title="SAVAGE × NOWA OSOBA",
-            description=(
-                f"↪ | Witaj {member.mention} na **SAVAGE**!\n"
-                f"❤ | Mamy nadzieję, że zostaniesz z nami na dłużej\n\n"
-                f"⚠ | Nieprzestrzeganie naszego **regulaminu** może wiązać się z karą\n\n"
-                f"👤 | Jesteś naszym **{member_count}** użytkownikiem!"
-            ),
-            color=EMBED_COLOR
-        )
-        embed.set_thumbnail(url=member.display_avatar.url)
-        if BANNER_URL.startswith("http"):
-            embed.set_image(url=BANNER_URL)
-        embed.set_footer(text=FOOTER_TEXT)
-
-        await channel.send(embed=embed)
-
-# --- ZDARZENIE: SERWER BOOST ---
-@bot.event
-async def on_member_update(before: discord.Member, after: discord.Member):
-    if before.premium_since is None and after.premium_since is not None:
-        channel = after.guild.get_channel(BOOST_CHANNEL_ID)
-        if channel:
-            embed = discord.Embed(
-                title="💎 New server Boost!",
-                description=f"{after.mention} **BOOST!**\n> thanks for boosting our server!\n> *Go check out our booster zone!*",
-                color=EMBED_COLOR
-            )
-            embed.add_field(
-                name="Boost Info:",
-                value=f"🪩 | **Server Boost level:** `{after.guild.premium_tier}`\n🔢 | **Boost count:** `{after.guild.premium_subscription_count}`",
-                inline=False
-            )
-            embed.set_thumbnail(url=after.display_avatar.url)
-            if BANNER_URL.startswith("http"):
-                embed.set_image(url=BANNER_URL)
-            embed.set_footer(text=FOOTER_TEXT)
-
-            await channel.send(embed=embed)
-
-# --- CODZIENNE PRZYPOMNIENIE O MINIGRZE (O 19:00) ---
-@tasks.loop(time=datetime.time(hour=19, minute=0, tzinfo=ZoneInfo("Europe/Warsaw")))
-async def daily_minigame_reminder():
-    channel = bot.get_channel(MINIGAME_CHANNEL_ID)
-    if channel:
-        embed = discord.Embed(
-            title="🎮 Codzienna Minigra!",
-            description="Czas spróbować swojego szczęścia w minigrze na naszym kanale! Wejdź i wygraj nagrody.",
-            color=EMBED_COLOR
-        )
-        if BANNER_URL.startswith("http"):
-            embed.set_image(url=BANNER_URL)
-        embed.set_footer(text=FOOTER_TEXT)
-        await channel.send(embed=embed)
-
-# --- RESET COOLDOWNU O 23:59 ---
-@tasks.loop(time=datetime.time(hour=23, minute=59, tzinfo=ZoneInfo("Europe/Warsaw")))
-async def reset_minigame_cooldowns():
-    minigame_cooldowns.clear()
-
-@daily_minigame_reminder.before_loop
-@reset_minigame_cooldowns.before_loop
-async def before_loops():
-    await bot.wait_until_ready()
-
-# --- SYSTEM TICKETÓW Z PRZYCISKIEM ZAMYKANIA ---
+# --- PRZYCISK ZAMYKANIA TICKETA ---
 class CloseTicketView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="Zamknij ticket", style=discord.ButtonStyle.danger, custom_id="close_ticket_btn", emoji="🔒")
+    @discord.ui.button(label="Zamknij ticket ❌", style=discord.ButtonStyle.danger, custom_id="close_ticket_btn")
     async def close_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("🔒 Zamykanie kanału za 3 sekundy...", ephemeral=True)
-        import asyncio
-        await asyncio.sleep(3)
+        embed = discord.Embed(
+            title="SAVAGE × TICKET",
+            description="Ticket zostanie usunięty za kilka sekund...",
+            color=0x2b2d31
+        )
+        embed.set_image(url=BANNER_URL)
+        await interaction.response.send_message(embed=embed)
         await interaction.channel.delete()
 
+# --- SELECT MENU DO TICKETA ---
 class TicketSelect(discord.ui.Select):
     def __init__(self):
         options = [
-            discord.SelectOption(label="Ticket Owner", description="ticket with a matter for the config owners", emoji="👑", value="Owner"),
-            discord.SelectOption(label="Ticket Partner", description="Ticket for partnership", emoji="🤝", value="Partner"),
-            discord.SelectOption(label="Ticket Recruitment", description="Open if you want to join our team", emoji="📝", value="Recruitment"),
+            discord.SelectOption(
+                label="Ticket Owner",
+                description="Open if you have a demand to the owners",
+                emoji="👑",
+                value="owner"
+            ),
+            discord.SelectOption(
+                label="Ticket Partner",
+                description="Open if you want to collaborate with us.",
+                emoji="🤝",
+                value="partner"
+            ),
+            discord.SelectOption(
+                label="Ticket Recruitment",
+                description="Open if you want to join our team",
+                emoji="📝",
+                value="recruitment"
+            )
         ]
-        super().__init__(placeholder="Select category...", min_values=1, max_values=1, custom_id="ticket_select_cat", options=options)
+        super().__init__(placeholder="Select category...", min_values=1, max_values=1, options=options, custom_id="ticket_select_menu")
 
     async def callback(self, interaction: discord.Interaction):
-        key = self.values[0]
-        cfg = TICKET_CONFIGS[key]
+        await interaction.response.defer(ephemeral=True)
+
         guild = interaction.guild
+        category_name = self.values[0]
+        
+        ping_roles = []
+        emoji_prefix = "🎫"
+        target_category_id = None
+
+        if category_name == "owner":
+            ping_roles = OWNER_ROLES
+            emoji_prefix = "👑"
+            target_category_id = CATEGORY_OWNER_ID
+        elif category_name == "partner":
+            ping_roles = PARTNER_ROLES
+            emoji_prefix = "🤝"
+            target_category_id = CATEGORY_PARTNER_ID
+        elif category_name == "recruitment":
+            ping_roles = RECRUITMENT_ROLES
+            emoji_prefix = "📝"
+            target_category_id = CATEGORY_RECRUITMENT_ID
+
+        category = guild.get_channel(target_category_id) if target_category_id else None
+        channel_name = f"{emoji_prefix}・ticket-{interaction.user.name}"
         
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(read_messages=False),
@@ -171,180 +139,131 @@ class TicketSelect(discord.ui.Select):
             guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True)
         }
 
-        for role_id in cfg["allowed_roles"]:
-            role = guild.get_role(role_id)
+        for r_id in ping_roles:
+            role = guild.get_role(r_id)
             if role:
                 overwrites[role] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
 
-        category = guild.get_channel(cfg["category_id"])
-        ticket_chan = await guild.create_text_channel(
-            name=f"{key.lower()}-{interaction.user.name}", 
-            category=category if isinstance(category, discord.CategoryChannel) else None,
+        ticket_channel = await guild.create_text_channel(
+            name=channel_name, 
+            category=category, 
             overwrites=overwrites
         )
+
+        pings_formatted = " ".join([f"<@&{r_id}>" for r_id in ping_roles])
         
         embed = discord.Embed(
-            title=f"SAVAGE • {key}",
-            description=f"Witaj {interaction.user.mention}!\nWybrano kategorię: **{key}**.\nOpisz swój problem lub sprawę.",
-            color=EMBED_COLOR
+            title=f"SAVAGE × {category_name.upper()}",
+            description="Cześć! Witaj w SAVAGE, opisz dokładnie swoją sytuację, a nasza administracja wkrótce Ci pomoże.",
+            color=0x2b2d31
         )
-        if BANNER_URL.startswith("http"):
-            embed.set_image(url=BANNER_URL)
-        embed.set_footer(text=FOOTER_TEXT)
-        
-        await ticket_chan.send(embed=embed, view=CloseTicketView())
-        await interaction.response.send_message(f"✅ Utworzono ticket: {ticket_chan.mention}", ephemeral=True)
+        embed.set_image(url=BANNER_URL)
+
+        await ticket_channel.send(content=f"{interaction.user.mention} {pings_formatted}", embed=embed, view=CloseTicketView())
+        await interaction.followup.send(f"Stworzono ticket: {ticket_channel.mention}", ephemeral=True)
 
 class TicketView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
         self.add_item(TicketSelect())
 
-# --- KOMENDA SETUP TICKETS ---
-@bot.tree.command(name="setup_tickets", description="Wysyła panel ticketów")
+# --- EVENTY BOTA ---
+@bot.event
+async def on_ready():
+    print(f"Zalogowano jako {bot.user}")
+    bot.add_view(TicketView())
+    bot.add_view(CloseTicketView())
+    try:
+        synced = await bot.tree.sync()
+        print(f"Zsynchronizowano {len(synced)} komend slash")
+    except Exception as e:
+        print(f"Błąd synchronizacji: {e}")
+
+@bot.event
+async def on_member_join(member: discord.Member):
+    role = member.guild.get_role(AUTO_ROLE_ID)
+    if role:
+        try:
+            await member.add_roles(role)
+        except Exception as e:
+            print(f"Błąd przy nadawania roli: {e}")
+
+    welcome_channel = member.guild.get_channel(WELCOME_CHANNEL_ID)
+    if welcome_channel:
+        embed = discord.Embed(
+            title="SAVAGE × NOWA OSOBA",
+            description=f"➥ | Witaj {member.mention} na **SAVAGE**!\n❤ | Mamy nadzieję, że zostaniesz z nami na dłużej\n\n⚠ | Nieprzestrzeganie naszego **regulaminu** może wiązać się z karą",
+            color=0x2b2d31
+        )
+        embed.set_thumbnail(url=member.display_avatar.url)
+        embed.add_field(name="", value=f"👤 | Jesteś naszym **{member.guild.member_count}** użytkownikiem!", inline=False)
+        embed.set_image(url=BANNER_URL)
+        await welcome_channel.send(embed=embed)
+
+@bot.event
+async def on_member_update(before: discord.Member, after: discord.Member):
+    if len(before.roles) < len(after.roles):
+        premium_role = after.guild.premium_subscriber_role
+        if premium_role and premium_role not in before.roles and premium_role in after.roles:
+            boost_channel = after.guild.get_channel(BOOST_CHANNEL_ID)
+            if boost_channel:
+                embed = discord.Embed(
+                    title="💎 New server Boost!",
+                    description=f"{after.mention} **BOOST!**\nthanks for boosting our server!\nGo check out our booster zone!",
+                    color=0x2b2d31
+                )
+                embed.set_thumbnail(url=after.display_avatar.url)
+                embed.add_field(name="Boost Info:", value=f"🧊 **Server Boost level:** {after.guild.premium_tier}\n🔢 **Boost count:** {after.guild.premium_subscription_count}", inline=False)
+                embed.set_image(url=BANNER_URL)
+                await boost_channel.send(embed=embed)
+
+# --- KOMENDY SLASH ---
+
+@bot.tree.command(name="setup_tickets", description="Wysyła panel ticketów na odpowiedni kanał")
 async def setup_tickets(interaction: discord.Interaction):
-    if interaction.channel_id != ALLOWED_COMMAND_CHANNEL_ID:
-        await interaction.response.send_message(f"❌ Tej komendy można używać tylko na kanale <#{ALLOWED_COMMAND_CHANNEL_ID}>!", ephemeral=True)
-        return
+    if not has_allowed_role(interaction.user):
+        return await interaction.response.send_message("Nie masz uprawnień do używania tej komendy!", ephemeral=True)
+
+    if interaction.channel_id != SETUP_CMD_CHANNEL_ID:
+        return await interaction.response.send_message(f"Tą komendę możesz wykonać tylko na kanale <#{SETUP_CMD_CHANNEL_ID}>!", ephemeral=True)
+
+    target_channel = interaction.guild.get_channel(TICKET_PANEL_CHANNEL_ID)
+    if not target_channel:
+        return await interaction.response.send_message("Nie znaleziono docelowego kanału ticketów!", ephemeral=True)
+
+    chat_channel = discord.utils.get(interaction.guild.text_channels, name="chat")
+    chat_mention = chat_channel.mention if chat_channel else "#chat"
 
     embed = discord.Embed(
         title="Tickets",
         description=(
-            "👑 | **Ticket Owner**\n*Open if you have a demand to the owners*\n\n"
-            "🤝 | **Ticket Partner**\n*Open if you want to collaborate with us*\n\n"
-            "📝 | **Ticket Recruitment**\n*Open if you want to join our team*\n\n"
-            "📌 | **For any issues, text on #chat**"
+            "👑 | **Ticket Owner**\n"
+            "Open if you have a demand to the owners\n\n"
+            "🤝 | **Ticket Partner**\n"
+            "Open if you want to collaborate with us\n\n"
+            "📝 | **Ticket Recruitment**\n"
+            "Open if you want to join our team\n\n"
+            f"📌 | **For any issues, text on** {chat_mention}"
         ),
-        color=EMBED_COLOR
+        color=0x2b2d31
     )
-    if BANNER_URL.startswith("http"):
-        embed.set_image(url=BANNER_URL)
-    embed.set_footer(text=FOOTER_TEXT)
+    embed.set_image(url=BANNER_URL)
+    embed.set_footer(text="Savage")
     
-    channel = bot.get_channel(TICKET_CHANNEL_ID) or interaction.channel
-    await channel.send(embed=embed, view=TicketView())
-    await interaction.response.send_message("✅ Wysłano panel ticketów!", ephemeral=True)
+    await target_channel.send(embed=embed, view=TicketView())
+    await interaction.response.send_message(f"Pomyślnie wysłano panel ticketów na kanał {target_channel.mention}!", ephemeral=True)
 
-# --- KOMENDA MINIGAME ---
-@bot.tree.command(name="minigame", description="Zagraj w codzienną minigrę!")
-async def minigame(interaction: discord.Interaction):
-    if interaction.channel_id != MINIGAME_CHANNEL_ID:
-        await interaction.response.send_message(f"❌ Minigry można używać tylko na kanale <#{MINIGAME_CHANNEL_ID}>!", ephemeral=True)
-        return
+@bot.tree.command(name="say", description="Wysyła ogłoszenie w formie estetycznego embeda")
+@app_commands.describe(wiadomosc="Treść wiadomości", kanal="Kanał na którym ma zostać wysłana wiadomość")
+async def say(interaction: discord.Interaction, wiadomosc: str, kanal: discord.TextChannel):
+    if not has_allowed_role(interaction.user):
+        return await interaction.response.send_message("Nie masz uprawnień do używania tej komendy!", ephemeral=True)
 
-    user_id = interaction.user.id
-    dzis = datetime.datetime.now(ZoneInfo("Europe/Warsaw")).date()
-
-    if minigame_cooldowns.get(user_id) == dzis:
-        await interaction.response.send_message("⏳ Wykorzystałeś już próbę na dziś! Spróbuj ponownie jutro lub po godzinie 23:59.", ephemeral=True)
-        return
-
-    minigame_cooldowns[user_id] = dzis
-    win = random.randint(1, 5) == 1
-
-    embed = discord.Embed(color=EMBED_COLOR)
-    if BANNER_URL.startswith("http"):
-        embed.set_image(url=BANNER_URL)
-    embed.set_footer(text=FOOTER_TEXT)
-
-    if win:
-        role = interaction.guild.get_role(MINIGAME_REWARD_ROLE_ID)
-        if role:
-            await interaction.user.add_roles(role)
-        embed.title = "🎉 Gratulacje!"
-        embed.description = f"🐱 {interaction.user.mention}, **wygrałeś w minigrze!** Otrzymałeś specjalną nagrodę i rolę!"
-    else:
-        embed.title = "🐱 We're sorry!"
-        embed.description = f"🐈 {interaction.user.mention}, **this time you didn't win anything.** Try your luck again tomorrow!\n\n**Some Info:**\n*Your chance was **1** in **5**.*\n\n*We wish you better luck next time!*"
-
-    await interaction.response.send_message(embed=embed)
-
-# --- KOMENDY BANDC / UNBANDC ---
-@bot.tree.command(name="bandc", description="Banuje użytkownika na serwerze")
-@app_commands.checks.has_permissions(ban_members=True)
-async def bandc(interaction: discord.Interaction, member: discord.Member, reason: str = "Brak powodu"):
-    await member.ban(reason=reason)
-    
     embed = discord.Embed(
-        title="🔨 User has been banned for life",
-        color=0xFF0000
+        title="SAVAGE × OGŁOSZENIE",
+        description=wiadomosc,
+        color=0x2b2d31
     )
-    embed.add_field(name="👤 User", value=f"{member.mention}", inline=True)
-    embed.add_field(name="🆔 ID", value=f"`{member.id}`", inline=True)
-    embed.add_field(name="🛡️ Administrator", value=f"{interaction.user.mention}", inline=False)
-    embed.add_field(name="📝 Reason", value=f"`{reason}`", inline=False)
-    if BANNER_URL.startswith("http"):
-        embed.set_image(url=BANNER_URL)
-    embed.set_footer(text="Savage Security")
-
-    await interaction.response.send_message(embed=embed)
-
-@bot.tree.command(name="unbandc", description="Odbanowuje użytkownika po ID")
-@app_commands.checks.has_permissions(ban_members=True)
-async def unbandc(interaction: discord.Interaction, user_id: str):
-    try:
-        user = await bot.fetch_user(int(user_id))
-        await interaction.guild.unban(user)
-        
-        embed = discord.Embed(
-            title="🔓 User has been unbanned",
-            description=f"Użytkownik **{user.name}** (`{user.id}`) został pomyślnie odbanowany.",
-            color=0x00FF00
-        )
-        if BANNER_URL.startswith("http"):
-            embed.set_image(url=BANNER_URL)
-        embed.set_footer(text="Savage Security")
-        
-        await interaction.response.send_message(embed=embed)
-    except Exception:
-        await interaction.response.send_message("❌ Nie znaleziono użytkownika lub błąd odbanowania.", ephemeral=True)
-
-# --- KOMENDA SAY W STYLU SAVAGE Z BANNEREM ---
-@bot.tree.command(name="say", description="Wysyła ogłoszenie w stylu SAVAGE z bannerem na wskazany kanał")
-@app_commands.checks.has_permissions(manage_messages=True)
-async def say(
-    interaction: discord.Interaction, 
-    channel_id: str, 
-    tytul: str, 
-    wiadomosc: str
-):
-    if interaction.channel_id != ALLOWED_COMMAND_CHANNEL_ID:
-        await interaction.response.send_message(f"❌ Tej komendy można używać tylko na kanale <#{ALLOWED_COMMAND_CHANNEL_ID}>!", ephemeral=True)
-        return
-
-    try:
-        channel = bot.get_channel(int(channel_id))
-        if not channel:
-            await interaction.response.send_message("❌ Nie znaleziono kanału o podanym ID.", ephemeral=True)
-            return
-
-        formatted_message = wiadomosc.replace("\\n", "\n")
-
-        embed = discord.Embed(
-            title=f"SAVAGE × {tytul}",
-            description=formatted_message,
-            color=EMBED_COLOR
-        )
-
-        if BANNER_URL.startswith("http"):
-            embed.set_image(url=BANNER_URL)
-            
-        embed.set_footer(text=FOOTER_TEXT)
-
-        await channel.send(embed=embed)
-        await interaction.response.send_message(f"✅ Wysłano ogłoszenie na kanał {channel.mention}!", ephemeral=True)
-
-    except Exception as e:
-        await interaction.response.send_message(f"❌ Wystąpił błąd: {e}", ephemeral=True)
-
-@bot.event
-async def on_ready():
-    print(f"Zalogowano jako {bot.user.name}!")
-    bot.add_view(TicketView())
-    bot.add_view(CloseTicketView())
-
-token = os.getenv("DISCORD_TOKEN")
-if token:
-    bot.run(token)
-else:
-    print("BŁĄD: Brak zmiennej DISCORD_TOKEN!")
+    embed.set_image(url=BANNER_URL)
+    await kanal.send(embed=embed)
+    await interaction.response.send
