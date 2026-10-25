@@ -266,4 +266,9 @@ async def say(interaction: discord.Interaction, wiadomosc: str, kanal: discord.T
     )
     embed.set_image(url=BANNER_URL)
     await kanal.send(embed=embed)
-    await interaction.response.send
+    await interaction.response.send_message(f"Wysłano wiadomość na kanał {kanal.mention}!", ephemeral=True)
+
+@bot.tree.command(name="bandc", description="Baniuje użytkownika i czyści jego wiadomości")
+@app_commands.describe(user="Użytkownik do zbanowania", powod="Powód bana")
+async def bandc(interaction: discord.Interaction, user: discord.Member, powod: str = "Brak powodu"):
+    if not has_
