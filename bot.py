@@ -168,4 +168,48 @@ class TicketView(discord.ui.View):
         self.add_item(TicketSelect())
 
 # --- EVENTY BOTA ---
-@bot.
+@bot.event
+async def on_ready():
+    print(f"Zalogowano jako {bot.user}")
+    bot.add_view(TicketView())
+    bot.add_view(CloseTicketView())
+    try:
+        synced = await bot.tree.sync()
+        print(f"Zsynchronizowano {len(synced)} komend slash")
+    except Exception as e:
+        print(f"Błąd synchronizacji: {e}")
+
+@bot.event
+async def on_member_join(member: discord.Member):
+    role = member.guild.get_role(AUTO_ROLE_ID)
+    if role:
+        try:
+            await member.add_roles(role)
+        except Exception as e:
+            print(f"Błąd przy nadawania roli: {e}")
+
+    welcome_channel = member.guild.get_channel(WELCOME_CHANNEL_ID)
+    if welcome_channel:
+        embed = discord.Embed(
+            title="SAVAGE × NOWA OSOBA",
+            description=f"➥ | Witaj {member.mention} na **SAVAGE**!\n❤ | Mamy nadzieję, że zostaniesz z nami na dłużej\n\n⚠ | Nieprzestrzeganie naszego **regulaminu** może wiązać się z karą",
+            color=0x2b2d31
+        )
+        embed.set_thumbnail(url=member.display_avatar.url)
+        embed.add_field(name="", value=f"👤 | Jesteś naszym **{member.guild.member_count}** użytkownikiem!", inline=False)
+        embed.set_image(url=BANNER_URL)
+        await welcome_channel.send(embed=embed)
+
+@bot.event
+async def on_member_update(before: discord.Member, after: discord.Member):
+    if len(before.roles) < len(after.roles):
+        premium_role = after.guild.premium_subscriber_role
+        if premium_role and premium_role not in before.roles and premium_role in after.roles:
+            boost_channel = after.guild.get_channel(BOOST_CHANNEL_ID)
+            if boost_channel:
+                embed = discord.Embed(
+                    title="💎 New server Boost!",
+                    description=f"{after.mention} **BOOST!**\nthanks for boosting our server!\nGo check out our booster zone!",
+                    color=0x2b2d31
+                )
+                embed.set_thumbnail(
