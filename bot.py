@@ -6,10 +6,10 @@ import discord
 from discord.ext import commands, tasks
 from discord import app_commands
 
-# --- KONFIGURACJA POLISHCFG ---
+# --- KONFIGURACJA SAVAGE ---
 EMBED_COLOR = 0x2B2D31
 BANNER_URL = "https://cdn.discordapp.com/attachments/1563292364414648471/1563987942819762176/Gemini_Generated_Image_ksdzv8ksdzv8ksdz.jpg"
-FOOTER_TEXT = "POLISHCFG"
+FOOTER_TEXT = "Savage"
 
 # --- ID KANAŁÓW I RÓL ---
 WELCOME_CHANNEL_ID = 1561740336726937660
@@ -21,10 +21,10 @@ ALLOWED_COMMAND_CHANNEL_ID = 1561758533446410251
 AUTO_ROLE_ID = 1540360249775493230
 MINIGAME_REWARD_ROLE_ID = 1562816846535729222
 
-# Kategorie ticketów i ich uprawnienia oraz ID kategorii (zgodnie z wytycznymi)
+# Konfiguracja ról i kategorii ticketów
 TICKET_CONFIGS = {
     "Owner": {
-        "category_id": 1563539138073075795, # Użyj głównego id lub jako przypisanie
+        "category_id": 1563539138073075795,
         "allowed_roles": [1540359821323149392, 1540495893399081061],
         "emoji": "👑",
         "desc": "ticket with a matter for the config owners"
@@ -45,7 +45,7 @@ TICKET_CONFIGS = {
 
 minigame_cooldowns = {}
 
-class PolishBot(commands.Bot):
+class SavageBot(commands.Bot):
     def __init__(self):
         intents = discord.Intents.default()
         intents.message_content = True
@@ -59,9 +59,9 @@ class PolishBot(commands.Bot):
         daily_minigame_reminder.start()
         reset_minigame_cooldowns.start()
 
-bot = PolishBot()
+bot = SavageBot()
 
-# --- ZDARZENIE: WEJŚCIE UŻYTKOWNIKA (Styl Savage/Polishcfg) ---
+# --- ZDARZENIE: WEJŚCIE UŻYTKOWNIKA ---
 @bot.event
 async def on_member_join(member: discord.Member):
     role = member.guild.get_role(AUTO_ROLE_ID)
@@ -75,9 +75,9 @@ async def on_member_join(member: discord.Member):
     if channel:
         member_count = member.guild.member_count
         embed = discord.Embed(
-            title="POLISHCFG × NOWA OSOBA",
+            title="SAVAGE × NOWA OSOBA",
             description=(
-                f"↪ | Witaj {member.mention} na **POLISHCFG**!\n"
+                f"↪ | Witaj {member.mention} na **SAVAGE**!\n"
                 f"❤ | Mamy nadzieję, że zostaniesz z nami na dłużej\n\n"
                 f"⚠ | Nieprzestrzeganie naszego **regulaminu** może wiązać się z karą\n\n"
                 f"👤 | Jesteś naszym **{member_count}** użytkownikiem!"
@@ -91,7 +91,7 @@ async def on_member_join(member: discord.Member):
 
         await channel.send(embed=embed)
 
-# --- ZDARZENIE: SERWER BOOST (Styl z kanału boostów) ---
+# --- ZDARZENIE: SERWER BOOST ---
 @bot.event
 async def on_member_update(before: discord.Member, after: discord.Member):
     if before.premium_since is None and after.premium_since is not None:
@@ -110,7 +110,7 @@ async def on_member_update(before: discord.Member, after: discord.Member):
             embed.set_thumbnail(url=after.display_avatar.url)
             if BANNER_URL.startswith("http"):
                 embed.set_image(url=BANNER_URL)
-            embed.set_footer(text="polishcfg")
+            embed.set_footer(text=FOOTER_TEXT)
 
             await channel.send(embed=embed)
 
@@ -171,7 +171,6 @@ class TicketSelect(discord.ui.Select):
             guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True)
         }
 
-        # Dodanie uprawnień dla odpowiednich ról z konfiguracji
         for role_id in cfg["allowed_roles"]:
             role = guild.get_role(role_id)
             if role:
@@ -185,7 +184,7 @@ class TicketSelect(discord.ui.Select):
         )
         
         embed = discord.Embed(
-            title=f"POLISHCFG • {key}",
+            title=f"SAVAGE • {key}",
             description=f"Witaj {interaction.user.mention}!\nWybrano kategorię: **{key}**.\nOpisz swój problem lub sprawę.",
             color=EMBED_COLOR
         )
@@ -220,7 +219,7 @@ async def setup_tickets(interaction: discord.Interaction):
     )
     if BANNER_URL.startswith("http"):
         embed.set_image(url=BANNER_URL)
-    embed.set_footer(text="POLISHCFG")
+    embed.set_footer(text=FOOTER_TEXT)
     
     channel = bot.get_channel(TICKET_CHANNEL_ID) or interaction.channel
     await channel.send(embed=embed, view=TicketView())
@@ -276,7 +275,7 @@ async def bandc(interaction: discord.Interaction, member: discord.Member, reason
     embed.add_field(name="📝 Reason", value=f"`{reason}`", inline=False)
     if BANNER_URL.startswith("http"):
         embed.set_image(url=BANNER_URL)
-    embed.set_footer(text="POLISHCFG Security")
+    embed.set_footer(text="Savage Security")
 
     await interaction.response.send_message(embed=embed)
 
@@ -294,22 +293,20 @@ async def unbandc(interaction: discord.Interaction, user_id: str):
         )
         if BANNER_URL.startswith("http"):
             embed.set_image(url=BANNER_URL)
-        embed.set_footer(text="POLISHCFG Security")
+        embed.set_footer(text="Savage Security")
         
         await interaction.response.send_message(embed=embed)
     except Exception:
         await interaction.response.send_message("❌ Nie znaleziono użytkownika lub błąd odbanowania.", ephemeral=True)
 
-# --- KOMENDA SAY ---
-@bot.tree.command(name="say", description="Wysyła ramkę z wiadomością na wskazany kanał")
+# --- KOMENDA SAY W STYLU SAVAGE Z BANNEREM ---
+@bot.tree.command(name="say", description="Wysyła ogłoszenie w stylu SAVAGE z bannerem na wskazany kanał")
 @app_commands.checks.has_permissions(manage_messages=True)
 async def say(
     interaction: discord.Interaction, 
     channel_id: str, 
-    wiadomosc: str, 
-    tytul: str = None, 
-    obrazek: str = None, 
-    stopka: str = "polishcfg"
+    tytul: str, 
+    wiadomosc: str
 ):
     if interaction.channel_id != ALLOWED_COMMAND_CHANNEL_ID:
         await interaction.response.send_message(f"❌ Tej komendy można używać tylko na kanale <#{ALLOWED_COMMAND_CHANNEL_ID}>!", ephemeral=True)
@@ -324,19 +321,18 @@ async def say(
         formatted_message = wiadomosc.replace("\\n", "\n")
 
         embed = discord.Embed(
-            title=tytul,
+            title=f"SAVAGE × {tytul}",
             description=formatted_message,
             color=EMBED_COLOR
         )
 
-        if obrazek and obrazek.startswith("http"):
-            embed.set_image(url=obrazek)
-
-        if stopka:
-            embed.set_footer(text=stopka)
+        if BANNER_URL.startswith("http"):
+            embed.set_image(url=BANNER_URL)
+            
+        embed.set_footer(text=FOOTER_TEXT)
 
         await channel.send(embed=embed)
-        await interaction.response.send_message(f"✅ Wysłano ramkę na kanał {channel.mention}!", ephemeral=True)
+        await interaction.response.send_message(f"✅ Wysłano ogłoszenie na kanał {channel.mention}!", ephemeral=True)
 
     except Exception as e:
         await interaction.response.send_message(f"❌ Wystąpił błąd: {e}", ephemeral=True)
