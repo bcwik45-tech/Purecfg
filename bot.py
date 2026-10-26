@@ -308,4 +308,4 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 if TOKEN:
     bot.run(TOKEN)
 else:
-    print("CRITICAL ERROR
+    print("CRITICAL ERROR: Brak zmiennej środowiskowej DISCORD_TOKEN!")
