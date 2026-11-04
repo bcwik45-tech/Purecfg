@@ -3,12 +3,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-# Konfiguracja intencji (Intents)
-intents = discord.Intents.default()
-intents.guilds = True
-intents.members = True
-intents.message_content = True
-intents.guild_invites = True
+# Konfiguracja intencji - używamy all(), aby uniknąć problemów z wersjami discord.py
+intents = discord.Intents.all()
 
 class ShadersBot(commands.Bot):
     def __init__(self):
@@ -104,7 +100,6 @@ async def on_message(message: discord.Message):
     
     legit_channel_id = 1566908229081108620
     if message.channel.id == legit_channel_id:
-        # Usuwanie starych wiadomości bota na kanale
         try:
             async for m in message.channel.history(limit=10):
                 if m.author == client.user:
@@ -388,5 +383,4 @@ async def unbandc_cmd(interaction: discord.Interaction, id: str):
     embed.set_image(url="https://cdn.discordapp.com/attachments/1563292364414648471/1567487782757204009/unban.jpg")
     await interaction.response.send_message(embed=embed)
 
-# Uruchomienie bota (token pobierany ze zmiennej środowiskowej Render.com)
 client.run(os.getenv("DISCORD_TOKEN"))
