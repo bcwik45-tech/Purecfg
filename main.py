@@ -5,7 +5,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-# --- POPRAWIONY SERWER HTTP DLA RENDER & UPTIMEROBOT ---
+# --- SERWER HTTP DLA RENDER & UPTIMEROBOT ---
 class SimpleHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -61,4 +61,16 @@ async def on_member_join(member: discord.Member):
         embed.set_image(url="https://cdn.discordapp.com/attachments/1563292364414648471/1567487836457009162/welcome.jpg")
         await welcome_channel.send(embed=embed)
 
-    invite_channel = member.guild.get_channel(invite
+    invite_channel = member.guild.get_channel(invite_channel_id)
+    if invite_channel:
+        invite_source = "discord.gg/shadersproject"
+        vanity_uses = 0
+        try:
+            vanity = await member.guild.vanity_invite()
+            if vanity:
+                vanity_uses = vanity.uses
+        except Exception:
+            pass
+
+        embed_inv = discord.Embed(
+            title="<:welcome1:156748
