@@ -128,7 +128,7 @@ async def on_message(message: discord.Message):
                 "📋 **WYMAGANY WZÓR**\n"
                 "```+rep @osoba opis transakcji | kwota PLN | metoda```\n\n"
                 "☑️ **PRZYKŁAD**\n"
-                "```+rep @sprzedawca nazwa_produktu | 30 PLN | BLIK```"
+                "```+rep @sprzedawca nazwa_produktu | kwota PLN | BLIK```"
             ),
             color=0x2b2d31
         )
@@ -355,7 +355,7 @@ async def legit_cmd(interaction: discord.Interaction):
             "📋 **WYMAGANY WZÓR**\n"
             "```+rep @osoba opis transakcji | kwota PLN | metoda```\n\n"
             "☑️ **PRZYKŁAD**\n"
-            "```+rep @sprzedawca nazwa_produktu | 30 PLN | BLIK```"
+            "```+rep @sprzedawca nazwa_produktu | kwota PLN | BLIK```"
         ),
         color=0x2b2d31
     )
