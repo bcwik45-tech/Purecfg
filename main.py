@@ -105,7 +105,7 @@ async def on_member_update(before: discord.Member, after: discord.Member):
             embed.set_footer(text="SHADERS PROJECT")
             await boost_channel.send(embed=embed)
 
-# --- 3. LEGIT CHECK ---
+# --- 3. LEGIT CHECK AUTO-FORMAT ---
 @client.event
 async def on_message(message: discord.Message):
     if message.author.bot:
@@ -128,7 +128,7 @@ async def on_message(message: discord.Message):
                 "📋 **WYMAGANY WZÓR**\n"
                 "```+rep @osoba opis transakcji | kwota PLN | metoda```\n\n"
                 "☑️ **PRZYKŁAD**\n"
-                "```+rep @sprzedawca Bulletki | 30 PLN | BLIK```"
+                "```+rep @sprzedawca nazwa_produktu | 30 PLN | BLIK```"
             ),
             color=0x2b2d31
         )
@@ -174,11 +174,11 @@ class RekrutacjaView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="Media", style=discord.ButtonStyle.primary, custom_id="rekru_media")
+    @discord.ui.button(label="Media", style=discord.ButtonStyle.secondary, custom_id="rekru_media")
     async def media_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.create_ticket(interaction, "media", 1567494614322122832)
 
-    @discord.ui.button(label="Administracja", style=discord.ButtonStyle.primary, custom_id="rekru_admin")
+    @discord.ui.button(label="Administracja", style=discord.ButtonStyle.secondary, custom_id="rekru_admin")
     async def admin_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.create_ticket(interaction, "administracja", 1567494915745644636)
 
@@ -202,6 +202,18 @@ class RekrutacjaView(discord.ui.View):
         await interaction.response.send_message(content=f"Utworzono kanał: {channel.mention}", ephemeral=True)
 
 
+class CloseTicketView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="🔒 Zamknij ticket", style=discord.ButtonStyle.danger, custom_id="close_ticket_btn")
+    async def close_callback(self, interaction: discord.Interaction):
+        await interaction.response.send_message("Zamykanie kanału za 3 sekundy...", ephemeral=True)
+        import asyncio
+        await asyncio.sleep(3)
+        await interaction.channel.delete()
+
+
 class TicketSelect(discord.ui.Select):
     def __init__(self):
         options = [
@@ -219,8 +231,8 @@ class TicketSelect(discord.ui.Select):
         cat_map = {
             "ticket_owner": (1567496735360811049, [1540359821323149392, 1540495893399081061]),
             "ticket_shop": (1567497043134386226, [1540359821323149392, 1540495893399081061]),
-            "ticket_support": (1567497448379645984, []),
-            "ticket_partner": (1567497662406725673, [])
+            "ticket_support": (1567497448379645984, [1540359821323149392, 1540495893399081061]),
+            "ticket_partner": (1567497662406725673, [1540359821323149392, 1540495893399081061])
         }
 
         cat_id, role_ids = cat_map.get(val, (None, []))
@@ -240,13 +252,30 @@ class TicketSelect(discord.ui.Select):
             category=category,
             overwrites=overwrites
         )
-        await channel.send(f"Witaj {interaction.user.mention}! Opisz swoją sprawę, administracja zaraz odpowie.")
+        
+        pings = " ".join([f"<@&{r_id}>" for r_id in role_ids])
+        await channel.send(f"{pings} Witaj {interaction.user.mention}! Opisz swoją sprawę, administracja zaraz odpowie.", view=CloseTicketView())
         await interaction.response.send_message(content=f"Utworzono ticket: {channel.mention}", ephemeral=True)
 
 class TicketView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
         self.add_item(TicketSelect())
+
+
+class VerificationView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Zweryfikuj się", style=discord.ButtonStyle.success, emoji="✅", custom_id="btn_verify")
+    async def verify_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
+        role_id = 1540359821323149392  # Przykładowa rola weryfikacji
+        role = interaction.guild.get_role(role_id)
+        if role:
+            await interaction.user.add_roles(role)
+            await interaction.response.send_message("✅ Pomyślnie zweryfikowano!", ephemeral=True)
+        else:
+            await interaction.response.send_message("❌ Rola weryfikacji nie została skonfigurowana.", ephemeral=True)
 
 
 # --- KOMENDY SLASH ---
@@ -265,7 +294,7 @@ async def info_cmd(interaction: discord.Interaction):
         ),
         color=0x2b2d31
     )
-    embed.set_image(url="https://cdn.discordapp.com/attachments/1563292364414648471/1567487837324968017/ticket.jpg")
+    embed.set_image(url="https://cdn.discordapp.com/attachments/1563292364414648471/1567487781981126768/informacje.jpg")
     await target_channel.send(embed=embed, view=InfoView())
     await interaction.response.send_message("Wysłano panel informacyjny!", ephemeral=True)
 
@@ -283,6 +312,7 @@ async def rekrutacja_cmd(interaction: discord.Interaction):
         ),
         color=0x2b2d31
     )
+    embed.set_image(url="https://cdn.discordapp.com/attachments/1563292364414648471/1567487783180959874/rekrutacja.jpg")
     await target_channel.send(embed=embed, view=RekrutacjaView())
     await interaction.response.send_message("Wysłano panel rekrutacji!", ephemeral=True)
 
@@ -320,7 +350,7 @@ async def legit_cmd(interaction: discord.Interaction):
             "📋 **WYMAGANY WZÓR**\n"
             "```+rep @osoba opis transakcji | kwota PLN | metoda```\n\n"
             "☑️ **PRZYKŁAD**\n"
-            "```+rep @sprzedawca Bulletki | 30 PLN | BLIK```"
+            "```+rep @sprzedawca nazwa_produktu | 30 PLN | BLIK```"
         ),
         color=0x2b2d31
     )
@@ -328,13 +358,18 @@ async def legit_cmd(interaction: discord.Interaction):
     await target_channel.send(embed=embed)
     await interaction.response.send_message("Wysłano Legit Check!", ephemeral=True)
 
-@client.tree.command(name="accept", description="Akceptuje podanie gracza")
-@app_commands.describe(gracz="Oznaczenie gracza")
-async def accept_cmd(interaction: discord.Interaction, gracz: discord.Member):
+@client.tree.command(name="accept", description="Akceptuje podanie gracza i nadaje rolę")
+@app_commands.describe(gracz="Oznaczenie gracza", rola="Rola do nadania")
+async def accept_cmd(interaction: discord.Interaction, gracz: discord.Member, rola: discord.Role):
+    try:
+        await gracz.add_roles(rola)
+    except Exception:
+        pass
+
     result_channel = interaction.guild.get_channel(1566906866691473498)
     embed = discord.Embed(
         title="ℹ️ PODANIE",
-        description=f"👤 {gracz.mention}\n📖 Twoje podanie zostało **zaakceptowane**!",
+        description=f"👤 {gracz.mention}\n📖 Twoje podanie zostało **zaakceptowane**!\n🎁 Nadana rola: {rola.mention}",
         color=0x43b581
     )
     embed.set_image(url="https://cdn.discordapp.com/attachments/1563292364414648471/1567487783612719115/akcept.jpg")
@@ -342,7 +377,7 @@ async def accept_cmd(interaction: discord.Interaction, gracz: discord.Member):
     if result_channel:
         await result_channel.send(embed=embed)
     await interaction.channel.send(embed=embed)
-    await interaction.response.send_message("Podanie zaakceptowane!", ephemeral=True)
+    await interaction.response.send_message("Podanie zaakceptowane i rola nadana!", ephemeral=True)
 
 @client.tree.command(name="odrzucone", description="Odrzuca podanie gracza")
 @app_commands.describe(gracz="Oznaczenie gracza")
@@ -395,5 +430,43 @@ async def unbandc_cmd(interaction: discord.Interaction, id: str):
     )
     embed.set_image(url="https://cdn.discordapp.com/attachments/1563292364414648471/1567487782757204009/unban.jpg")
     await interaction.response.send_message(embed=embed)
+
+@client.tree.command(name="botkick", description="Wysyła panel blokady kanału")
+async def botkick_cmd(interaction: discord.Interaction):
+    if interaction.channel_id != 1561758533446410251:
+        return await interaction.response.send_message("Tę komendę można użyć tylko na kanale administracyjnym!", ephemeral=True)
+
+    target_channel = interaction.guild.get_channel(1566957838566432830)
+    
+    embed = discord.Embed(
+        description=(
+            "ℹ️ ┃ **PL UWAGA ┃ KANAŁ ZABLOKOWANY**\n"
+            "⚠️ ┃ Ten **kanał** jest tylko do odczytu.\n"
+            "⚠️ ┃ Pisanie **wiadomości** jest zabronione i skutkuje automatyczną przerwą\n\n"
+            "ℹ️ ┃ **EN WARNING ┃ READ ONLY CHANNEL**\n"
+            "⚠️ ┃ This **channel** is read-only.\n"
+            "⚠️ ┃ Sending any **message** will result in an automatic timeout."
+        ),
+        color=0x2b2d31
+    )
+    
+    if target_channel:
+        await target_channel.send(embed=embed)
+    await interaction.response.send_message("Wysłano panel blokady kanału!", ephemeral=True)
+
+@client.tree.command(name="setup_weryfikacja", description="Wysyła panel weryfikacji")
+async def setup_weryfikacja_cmd(interaction: discord.Interaction):
+    if interaction.channel_id != 1561758533446410251:
+        return await interaction.response.send_message("Tę komendę można użyć tylko na kanale administracyjnym!", ephemeral=True)
+
+    target_channel = interaction.guild.get_channel(1567509118661697566)
+    embed = discord.Embed(
+        title="✨ WERYFIKACJA DOSTĘPU ✨",
+        description="🌟 **Witaj graczu.** Aby uzyskać dostęp do kanałów kliknij poniższy przycisk **Weryfikacja**. 🔒",
+        color=0x5865F2
+    )
+    if target_channel:
+        await target_channel.send(embed=embed, view=VerificationView())
+    await interaction.response.send_message("Wysłano panel weryfikacji!", ephemeral=True)
 
 client.run(os.getenv("DISCORD_TOKEN"))
