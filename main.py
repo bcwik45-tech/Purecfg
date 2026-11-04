@@ -267,15 +267,15 @@ class VerificationView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="Zweryfikuj się", style=discord.ButtonStyle.success, emoji="✅", custom_id="btn_verify")
+    @discord.ui.button(label="Weryfikacja", style=discord.ButtonStyle.success, emoji="✅", custom_id="btn_verify")
     async def verify_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
-        role_id = 1540359821323149392  # Przykładowa rola weryfikacji
+        role_id = 1540360249775493230
         role = interaction.guild.get_role(role_id)
         if role:
             await interaction.user.add_roles(role)
             await interaction.response.send_message("✅ Pomyślnie zweryfikowano!", ephemeral=True)
         else:
-            await interaction.response.send_message("❌ Rola weryfikacji nie została skonfigurowana.", ephemeral=True)
+            await interaction.response.send_message("❌ Rola weryfikacji nie została znaleziona na serwerze.", ephemeral=True)
 
 
 # --- KOMENDY SLASH ---
