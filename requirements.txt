@@ -1,1 +1,1 @@
-discord.py
+echo "discord.py" > requirements.txt
