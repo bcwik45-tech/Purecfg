@@ -389,3 +389,89 @@ async def accept_cmd(interaction: discord.Interaction, gracz: discord.Member, ro
 async def odrzucone_cmd(interaction: discord.Interaction, gracz: discord.Member):
     result_channel = interaction.guild.get_channel(1566906866691473498)
     embed = discord.Embed(
+        title="ℹ️ PODANIE",
+        description=f"👤 {gracz.mention}\n📖 Twoje podanie zostało **odrzucone**.",
+        color=0xf04747
+    )
+    embed.set_image(url="https://cdn.discordapp.com/attachments/1563292364414648471/1567487784099516466/odrzucone.jpg")
+    
+    if result_channel:
+        await result_channel.send(embed=embed)
+    await interaction.channel.send(embed=embed)
+    await interaction.response.send_message("Podanie odrzucone!", ephemeral=True)
+
+@client.tree.command(name="bandc", description="Banuje użytkownika z powiadomieniem")
+@app_commands.describe(gracz="Użytkownik do zbanowania", powod="Powód bana")
+async def bandc_cmd(interaction: discord.Interaction, gracz: discord.Member, powod: str):
+    embed = discord.Embed(
+        title="🔨 User has been banned for life",
+        description=(
+            f"👤 **User**: {gracz.mention}\n"
+            f"🆔 **ID**: `{gracz.id}`\n"
+            f"🛡️ **Administrator**: {interaction.user.mention}\n"
+            f"📝 **Reason**:\n```{powod}```"
+        ),
+        color=0xff0000
+    )
+    embed.set_image(url="https://cdn.discordapp.com/attachments/1563292364414648471/1567487782325067896/ban.jpg")
+    
+    await gracz.ban(reason=powod)
+    await interaction.response.send_message(embed=embed)
+
+@client.tree.command(name="unbandc", description="Odbanowuje użytkownika")
+@app_commands.describe(id="ID użytkownika")
+async def unbandc_cmd(interaction: discord.Interaction, id: str):
+    user_id = int(id)
+    user = await client.fetch_user(user_id)
+    await interaction.guild.unban(user)
+
+    embed = discord.Embed(
+        title="🔓 User has been unbanned",
+        description=(
+            f"🆔 **ID**: `{user_id}`\n"
+            f"🛡️ **Administrator**: {interaction.user.mention}"
+        ),
+        color=0x43b581
+    )
+    embed.set_image(url="https://cdn.discordapp.com/attachments/1563292364414648471/1567487782757204009/unban.jpg")
+    await interaction.response.send_message(embed=embed)
+
+@client.tree.command(name="botkick", description="Wysyła panel blokady kanału")
+async def botkick_cmd(interaction: discord.Interaction):
+    if interaction.channel_id != 1561758533446410251:
+        return await interaction.response.send_message("Tę komendę można użyć tylko na kanale administracyjnym!", ephemeral=True)
+
+    target_channel = interaction.guild.get_channel(1566957838566432830)
+    
+    embed = discord.Embed(
+        description=(
+            "ℹ️ ┃ **PL UWAGA ┃ KANAŁ ZABLOKOWANY**\n"
+            "⚠️ ┃ Ten **kanał** jest tylko do odczytu.\n"
+            "⚠️ ┃ Pisanie **wiadomości** jest zabronione i skutkuje automatyczną przerwą\n\n"
+            "ℹ️ ┃ **EN WARNING ┃ READ ONLY CHANNEL**\n"
+            "⚠️ ┃ This **channel** is read-only.\n"
+            "⚠️ ┃ Sending any **message** will result in an automatic timeout."
+        ),
+        color=0x2b2d31
+    )
+    
+    if target_channel:
+        await target_channel.send(embed=embed)
+    await interaction.response.send_message("Wysłano panel blokady kanału!", ephemeral=True)
+
+@client.tree.command(name="setup_weryfikacja", description="Wysyła panel weryfikacji")
+async def setup_weryfikacja_cmd(interaction: discord.Interaction):
+    if interaction.channel_id != 1561758533446410251:
+        return await interaction.response.send_message("Tę komendę można użyć tylko na kanale administracyjnym!", ephemeral=True)
+
+    target_channel = interaction.guild.get_channel(1567509118661697566)
+    embed = discord.Embed(
+        title="✨ WERYFIKACJA DOSTĘPU ✨",
+        description="🌟 **Witaj graczu.** Aby uzyskać dostęp do kanałów kliknij poniższy przycisk **Weryfikacja**. 🔒",
+        color=0x43b581
+    )
+    if target_channel:
+        await target_channel.send(embed=embed, view=VerificationView())
+    await interaction.response.send_message("Wysłano panel weryfikacji!", ephemeral=True)
+
+client.run(os.getenv("DISCORD_TOKEN"))
