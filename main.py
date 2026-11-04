@@ -170,6 +170,18 @@ class InfoView(discord.ui.View):
         await interaction.response.send_message(embed=partner_embed, ephemeral=True)
 
 
+class CloseTicketView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="🔒 Zamknij ticket", style=discord.ButtonStyle.danger, custom_id="close_ticket_btn")
+    async def close_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("Zamykanie kanału za 3 sekundy...", ephemeral=True)
+        import asyncio
+        await asyncio.sleep(3)
+        await interaction.channel.delete()
+
+
 class RekrutacjaView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -185,33 +197,26 @@ class RekrutacjaView(discord.ui.View):
     async def create_ticket(self, interaction: discord.Interaction, t_type: str, cat_id: int):
         guild = interaction.guild
         category = guild.get_channel(cat_id)
+        role_ids = [1540359821323149392, 1540495893399081061]
         
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(view_channel=False),
-            interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True),
-            guild.get_role(1540495893399081061): discord.PermissionOverwrite(view_channel=True, send_messages=True),
-            guild.get_role(1540359821323149392): discord.PermissionOverwrite(view_channel=True, send_messages=True)
+            interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True)
         }
+        for r_id in role_ids:
+            role = guild.get_role(r_id)
+            if role:
+                overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
 
         channel = await guild.create_text_channel(
             name=f"{interaction.user.name}-{t_type}",
             category=category,
             overwrites=overwrites
         )
-        await channel.send(f"Witaj {interaction.user.mention}! Twoje zgłoszenie ({t_type}) zostało otwarte.")
+        
+        pings = " ".join([f"<@&{r_id}>" for r_id in role_ids])
+        await channel.send(f"{pings} Witaj {interaction.user.mention}! Twoje zgłoszenie rekrutacyjne ({t_type}) zostało otwarte.", view=CloseTicketView())
         await interaction.response.send_message(content=f"Utworzono kanał: {channel.mention}", ephemeral=True)
-
-
-class CloseTicketView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-
-    @discord.ui.button(label="🔒 Zamknij ticket", style=discord.ButtonStyle.danger, custom_id="close_ticket_btn")
-    async def close_callback(self, interaction: discord.Interaction):
-        await interaction.response.send_message("Zamykanie kanału za 3 sekundy...", ephemeral=True)
-        import asyncio
-        await asyncio.sleep(3)
-        await interaction.channel.delete()
 
 
 class TicketSelect(discord.ui.Select):
@@ -384,89 +389,3 @@ async def accept_cmd(interaction: discord.Interaction, gracz: discord.Member, ro
 async def odrzucone_cmd(interaction: discord.Interaction, gracz: discord.Member):
     result_channel = interaction.guild.get_channel(1566906866691473498)
     embed = discord.Embed(
-        title="ℹ️ PODANIE",
-        description=f"👤 {gracz.mention}\n📖 Twoje podanie zostało **odrzucone**.",
-        color=0xf04747
-    )
-    embed.set_image(url="https://cdn.discordapp.com/attachments/1563292364414648471/1567487784099516466/odrzucone.jpg")
-    
-    if result_channel:
-        await result_channel.send(embed=embed)
-    await interaction.channel.send(embed=embed)
-    await interaction.response.send_message("Podanie odrzucone!", ephemeral=True)
-
-@client.tree.command(name="bandc", description="Banuje użytkownika z powiadomieniem")
-@app_commands.describe(gracz="Użytkownik do zbanowania", powod="Powód bana")
-async def bandc_cmd(interaction: discord.Interaction, gracz: discord.Member, powod: str):
-    embed = discord.Embed(
-        title="🔨 User has been banned for life",
-        description=(
-            f"👤 **User**: {gracz.mention}\n"
-            f"🆔 **ID**: `{gracz.id}`\n"
-            f"🛡️ **Administrator**: {interaction.user.mention}\n"
-            f"📝 **Reason**:\n```{powod}```"
-        ),
-        color=0xff0000
-    )
-    embed.set_image(url="https://cdn.discordapp.com/attachments/1563292364414648471/1567487782325067896/ban.jpg")
-    
-    await gracz.ban(reason=powod)
-    await interaction.response.send_message(embed=embed)
-
-@client.tree.command(name="unbandc", description="Odbanowuje użytkownika")
-@app_commands.describe(id="ID użytkownika")
-async def unbandc_cmd(interaction: discord.Interaction, id: str):
-    user_id = int(id)
-    user = await client.fetch_user(user_id)
-    await interaction.guild.unban(user)
-
-    embed = discord.Embed(
-        title="🔓 User has been unbanned",
-        description=(
-            f"🆔 **ID**: `{user_id}`\n"
-            f"🛡️ **Administrator**: {interaction.user.mention}"
-        ),
-        color=0x43b581
-    )
-    embed.set_image(url="https://cdn.discordapp.com/attachments/1563292364414648471/1567487782757204009/unban.jpg")
-    await interaction.response.send_message(embed=embed)
-
-@client.tree.command(name="botkick", description="Wysyła panel blokady kanału")
-async def botkick_cmd(interaction: discord.Interaction):
-    if interaction.channel_id != 1561758533446410251:
-        return await interaction.response.send_message("Tę komendę można użyć tylko na kanale administracyjnym!", ephemeral=True)
-
-    target_channel = interaction.guild.get_channel(1566957838566432830)
-    
-    embed = discord.Embed(
-        description=(
-            "ℹ️ ┃ **PL UWAGA ┃ KANAŁ ZABLOKOWANY**\n"
-            "⚠️ ┃ Ten **kanał** jest tylko do odczytu.\n"
-            "⚠️ ┃ Pisanie **wiadomości** jest zabronione i skutkuje automatyczną przerwą\n\n"
-            "ℹ️ ┃ **EN WARNING ┃ READ ONLY CHANNEL**\n"
-            "⚠️ ┃ This **channel** is read-only.\n"
-            "⚠️ ┃ Sending any **message** will result in an automatic timeout."
-        ),
-        color=0x2b2d31
-    )
-    
-    if target_channel:
-        await target_channel.send(embed=embed)
-    await interaction.response.send_message("Wysłano panel blokady kanału!", ephemeral=True)
-
-@client.tree.command(name="setup_weryfikacja", description="Wysyła panel weryfikacji")
-async def setup_weryfikacja_cmd(interaction: discord.Interaction):
-    if interaction.channel_id != 1561758533446410251:
-        return await interaction.response.send_message("Tę komendę można użyć tylko na kanale administracyjnym!", ephemeral=True)
-
-    target_channel = interaction.guild.get_channel(1567509118661697566)
-    embed = discord.Embed(
-        title="✨ WERYFIKACJA DOSTĘPU ✨",
-        description="🌟 **Witaj graczu.** Aby uzyskać dostęp do kanałów kliknij poniższy przycisk **Weryfikacja**. 🔒",
-        color=0x5865F2
-    )
-    if target_channel:
-        await target_channel.send(embed=embed, view=VerificationView())
-    await interaction.response.send_message("Wysłano panel weryfikacji!", ephemeral=True)
-
-client.run(os.getenv("DISCORD_TOKEN"))
