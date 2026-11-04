@@ -61,6 +61,4 @@ async def on_member_join(member: discord.Member):
         embed.set_image(url="https://cdn.discordapp.com/attachments/1563292364414648471/1567487836457009162/welcome.jpg")
         await welcome_channel.send(embed=embed)
 
-    invite_channel = member.guild.get_channel(invite_channel_id)
-    if invite_channel:
-        invite_source = "discord.gg/shaders
+    invite_channel = member.guild.get_channel(invite
