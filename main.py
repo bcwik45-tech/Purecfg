@@ -49,11 +49,12 @@ async def on_member_join(member: discord.Member):
     welcome_channel = member.guild.get_channel(welcome_channel_id)
     if welcome_channel:
         embed = discord.Embed(
-            title="<:welcome1:1567488704979669003> NOWY UŻYTKOWNIK",
+            title="# NOWY UŻYTKOWNIK!",
             description=(
-                f"<:welcome2:1564005582736728156> Witaj, {member.mention}! Miło że wpadłeś jesteś naszą **{member.guild.member_count}** osobą!\n"
-                f"<:welcome2:1564005582736728156> Pobierz **najlepsze dodatki do fivem** właśnie tutaj!\n"
-                f"<:welcome2:1564005582736728156> **Życzymy** miłego pobytu na **SHADERS PROJECT**"
+                f"<:e1:1567488704979669003> Witaj, {member.mention}! Miło że wpadłeś jesteś naszą **{member.guild.member_count}** osobą!\n"
+                f"<:e2:1567955421547728976> Pobierz **najlepsze dodatki do fivem** właśnie tutaj!\n"
+                f"<:e3:1567955558571577446> **Życzymy** miłego pobytu na **SHADERS PROJECT**\n"
+                f"<:e4:1567955691359174749>"
             ),
             color=0x2b2d31
         )
@@ -73,12 +74,12 @@ async def on_member_join(member: discord.Member):
             pass
 
         embed_inv = discord.Embed(
-            title="<:welcome1:1567488704979669003> NOWE ZAPROSZENIE",
+            title="<:e1:1567955855318585364> NOWE ZAPROSZENIE",
             description=(
-                f"<:welcome2:1564005582736728156> Nowe dołączenie do **Serwera**.\n"
-                f"<:welcome2:1564005582736728156> Użytkownik: {member.mention}\n"
-                f"<:welcome2:1564005582736728156> Źródło: Własny link serwera (`{invite_source}`)\n"
-                f"<:welcome2:1564005582736728156> Łącznie użyć vanity: `{vanity_uses}`"
+                f"<:e2:1567488704979669003> Nowe dołączenie do **Serwera**.\n"
+                f"<:e3:1567955421547728976> Użytkownik: {member.mention}\n"
+                f"<:e4:1567956798345052220> Źródło: Własny link serwera (`{invite_source}`)\n"
+                f"Łącznie użyć vanity: `{vanity_uses}`"
             ),
             color=0x2b2d31
         )
@@ -93,14 +94,15 @@ async def on_member_update(before: discord.Member, after: discord.Member):
         boost_channel = after.guild.get_channel(boost_channel_id)
         if boost_channel:
             embed = discord.Embed(
-                title="<:boost1:1567489688032256041> New server Boost!",
+                title="# NOWY BOOST!",
                 description=(
                     f"{after.mention} **BOOST!**\n"
                     f"*thanks for boosting our server!*\n"
                     f"*Go check out our booster zone!*\n\n"
-                    f"<:boost2:1567489885365997638> **Boost level**\n"
-                    f"<:boost3:1567490142908719155> Server Boost level: `{after.guild.premium_tier}`\n"
-                    f"<:boost4:1567490339907043388> Boost count: `{after.guild.premium_subscription_count}`"
+                    f"<:b1:1567489885365997638> **Boost level**\n"
+                    f"<:b2:1567489688032256041> Server Boost level: `{after.guild.premium_tier}`\n"
+                    f"<:b3:1567490142908719155> Boost count: `{after.guild.premium_subscription_count}`\n"
+                    f"<:b4:1567490339907043388>"
                 ),
                 color=0xf47fff
             )
@@ -450,12 +452,12 @@ async def botkick_cmd(interaction: discord.Interaction):
     
     embed = discord.Embed(
         description=(
-            "ℹ️ ┃ **PL UWAGA ┃ KANAŁ ZABLOKOWANY**\n"
-            "⚠️ ┃ Ten **kanał** jest tylko do odczytu.\n"
-            "⚠️ ┃ Pisanie **wiadomości** jest zabronione i skutkuje automatyczną przerwą\n\n"
-            "ℹ️ ┃ **EN WARNING ┃ READ ONLY CHANNEL**\n"
-            "⚠️ ┃ This **channel** is read-only.\n"
-            "⚠️ ┃ Sending any **message** will result in an automatic timeout."
+            "<:k1:1567957479634112695> ┃ **PL UWAGA ┃ KANAŁ ZABLOKOWANY**\n"
+            "<:k2:1567957607942201364> ┃ Ten **kanał** jest tylko do odczytu.\n"
+            "<:k3:1567957607942201364> ┃ Pisanie **wiadomości** jest zabronione i skutkuje automatyczną przerwą\n\n"
+            "<:k4:1567957479634112695> ┃ **EN WARNING ┃ READ ONLY CHANNEL**\n"
+            "<:k5:1567957607942201364> ┃ This **channel** is read-only.\n"
+            "<:k6:1567957607942201364> ┃ Sending any **message** will result in an automatic timeout."
         ),
         color=0x2b2d31
     )
