@@ -1,386 +1,357 @@
 import os
+import asyncio
+from datetime import datetime
+from threading import Thread
+
 import discord
 from discord import app_commands
 from discord.ext import commands
+from flask import Flask
 
-# Konfiguracja intencji - używamy all(), aby uniknąć problemów z wersjami discord.py
-intents = discord.Intents.all()
+# ==========================================
+# KEEP-ALIVE SERVER FOR UPTIMEROBOT / RENDER
+# ==========================================
+app = Flask(__name__)
 
-class ShadersBot(commands.Bot):
+@app.route('/')
+def home():
+    return "KyroCFG Bot Status: Online"
+
+def run_flask():
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host='0.0.0.0', port=port)
+
+def keep_alive():
+    t = Thread(target=run_flask)
+    t.daemon = True
+    t.start()
+
+# ==========================================
+# BOT SETUP & CONSTANTS
+# ==========================================
+BANNER_URL = "https://cdn.discordapp.com/attachments/1561758533446410251/1568729185751671017/-_by_fin__3.jpg?ex=6af0e067&is=6aef8ee7&hm=f46719c8121b22952f76a25d02c8d82a489d8f2b93e30ad0c11080cf709a07a0&"
+
+# Emotikony powitań
+W_EMOJI = [
+    "https://cdn.discordapp.com/emojis/1568728427865841805.webp?size=96", # 1
+    "https://cdn.discordapp.com/emojis/1568728735765504120.webp?size=96", # 2
+    "https://cdn.discordapp.com/emojis/1568728589036163264.webp?size=96", # 3
+    "https://cdn.discordapp.com/emojis/1568727905465401464.webp?size=96", # 4
+    "https://cdn.discordapp.com/emojis/1567488704979669003.webp?size=96", # 5
+    "https://cdn.discordapp.com/emojis/1568728280603951195.webp?size=96"  # 6
+]
+
+# Emotikony boostów
+B_EMOJI = [
+    "https://cdn.discordapp.com/emojis/1567489885365997638.webp?size=96", # 1
+    "https://cdn.discordapp.com/emojis/1567489688032256041.webp?size=96", # 2
+    "https://cdn.discordapp.com/emojis/1567490142908719155.webp?size=96", # 3
+    "https://cdn.discordapp.com/emojis/1568728280603951195.webp?size=96"  # 4
+]
+
+# Kanały i Kategorie
+WELCOME_CHANNEL_ID = 1561740336726937660
+TICKETS_CMD_CHANNEL_ID = 1561758533446410251
+PANEL_TARGET_CHANNEL_ID = 1568723558069440582
+
+# Konfiguracje Ticketów
+TICKET_CONFIGS = {
+    "owner": {
+        "label": "Ticket Owner",
+        "desc": "Open if you have a demand to the owners",
+        "category_id": 1567496735360811049,
+        "access_roles": [1540359821323149392, 1540495893399081061],
+        "icon": "👑",
+        "style": discord.ButtonStyle.danger # Czerwony
+    },
+    "support": {
+        "label": "Ticket Support",
+        "desc": "Open if you need any help",
+        "category_id": 1567497448379645984,
+        "access_roles": [1568725620601524254],
+        "icon": "🛠️",
+        "style": discord.ButtonStyle.success # Zielony
+    },
+    "shop": {
+        "label": "Ticket Shop",
+        "desc": "Open if you want to buy something",
+        "category_id": 1567497043134386226,
+        "access_roles": [1540359821323149392],
+        "icon": "🛒",
+        "style": discord.ButtonStyle.primary # Niebieski
+    },
+    "partner": {
+        "label": "Ticket Partner",
+        "desc": "Open if you want to collaborate with us.",
+        "category_id": 1568731769782534374,
+        "access_roles": [1568725620601524254],
+        "icon": "🤝",
+        "style": discord.ButtonStyle.secondary # Żółty / Szary w discord.py API
+    }
+}
+
+intents = discord.Intents.default()
+intents.members = True
+intents.message_content = True
+intents.guilds = True
+
+bot = commands.Bot(command_prefix="!", intents=intents)
+
+# ==========================================
+# VIEWS & BUTTONS (TICKETS)
+# ==========================================
+class CloseTicketView(discord.ui.View):
     def __init__(self):
-        super().__init__(command_prefix="!", intents=intents)
+        super().__init__(timeout=None)
 
-    async def setup_hook(self):
-        # Synchronizacja komend slash z Discordem
-        await self.tree.sync()
-        print("Komendy slash zostały zsynchronizowane!")
+    @discord.ui.button(label="Close Ticket", style=discord.ButtonStyle.danger, emoji="🔒", custom_id="kyro_close_ticket")
+    async def close_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True)
+        channel = interaction.channel
+        
+        # Pobranie historii wiadomości do transkryptu
+        messages = []
+        async for msg in channel.history(limit=500, oldest_first=True):
+            time_str = msg.created_at.strftime("%Y-%m-%d %H:%M:%S")
+            messages.append(f"[{time_str}] {msg.author} ({msg.author.id}): {msg.clean_content}")
+            
+        transcript_text = "\n".join(messages)
+        
+        # Tworzenie pliku tekstowego
+        file_path = f"transcript-{channel.name}.txt"
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(f"TRANSCRIPT FOR TICKET: {channel.name}\n")
+            f.write(f"Generated at: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC\n")
+            f.write("="*50 + "\n\n")
+            f.write(transcript_text)
 
-client = ShadersBot()
+        # Znalezienie twórcy ticketu z nazwy kanału lub wzmianek
+        ticket_opener = None
+        for member in channel.members:
+            if not member.bot and member.name.lower() in channel.name:
+                ticket_opener = member
+                break
+        if not ticket_opener:
+            ticket_opener = interaction.user
 
-@client.event
-async def on_ready():
-    print(f"Zalogowano jako {client.user}!")
-
-# --- 1. POWITANIA (WELCOME) & ZAPROSZENIA ---
-@client.event
-async def on_member_join(member: discord.Member):
-    welcome_channel_id = 1561740336726937660
-    invite_channel_id = 1566902544406421615
-
-    # Kanał powitań
-    welcome_channel = member.guild.get_channel(welcome_channel_id)
-    if welcome_channel:
-        embed = discord.Embed(
-            title="<:welcome1:1567488704979669003> NOWY UŻYTKOWNIK",
-            description=(
-                f"<:welcome2:1564005582736728156> Witaj, {member.mention}! Miło że wpadłeś jesteś naszą **{member.guild.member_count}** osobą!\n"
-                f"<:welcome2:1564005582736728156> Pobierz **najlepsze dodatki do fivem** właśnie tutaj!\n"
-                f"<:welcome2:1564005582736728156> **Życzymy** miłego pobytu na **SHADERS PROJECT**"
-            ),
-            color=0x2b2d31
-        )
-        embed.set_thumbnail(url=member.display_avatar.url)
-        embed.set_image(url="https://cdn.discordapp.com/attachments/1563292364414648471/1567487836457009162/welcome.jpg")
-        await welcome_channel.send(embed=embed)
-
-    # Kanał zaproszeń / vanity
-    invite_channel = member.guild.get_channel(invite_channel_id)
-    if invite_channel:
-        invite_source = "discord.gg/shadersproject"
-        vanity_uses = 0
+        # Wysyłanie transkryptu na PV twórcy
         try:
-            vanity = await member.guild.vanity_invite()
-            if vanity:
-                vanity_uses = vanity.uses
-        except Exception:
-            pass
+            with open(file_path, "rb") as f:
+                discord_file = discord.File(f, filename=file_path)
+                embed = discord.Embed(
+                    title="📜 Ticket Transcript",
+                    description=f"Oto transkrypt Twojego ticketu z kanału **#{channel.name}**.",
+                    color=discord.Color.dark_gray()
+                )
+                embed.set_footer(text="Kyro")
+                await ticket_opener.send(embed=embed, file=discord_file)
+        except Exception as e:
+            print(f"Nie udało się wysłać transkryptu na PV: {e}")
 
-        embed_inv = discord.Embed(
-            title="<:welcome1:1567488704979669003> NOWE ZAPROSZENIE",
-            description=(
-                f"<:welcome2:1564005582736728156> Nowe dołączenie do **Serwera**.\n"
-                f"<:welcome2:1564005582736728156> Użytkownik: {member.mention}\n"
-                f"<:welcome2:1564005582736728156> Źródło: Własny link serwera (`{invite_source}`)\n"
-                f"<:welcome2:1564005582736728156> Łącznie użyć vanity: `{vanity_uses}`"
-            ),
-            color=0x2b2d31
-        )
-        embed_inv.set_image(url="https://cdn.discordapp.com/attachments/1563292364414648471/1567487781641527316/zaproszenie.jpg")
-        await invite_channel.send(embed=embed_inv)
+        # Usunięcie tymczasowego pliku z dysku
+        if os.path.exists(file_path):
+            os.remove(file_path)
 
-# --- 2. BOOSTY ---
-@client.event
-async def on_member_update(before: discord.Member, after: discord.Member):
-    boost_channel_id = 1563296339847282771
-    if not before.premium_since and after.premium_since:
-        boost_channel = after.guild.get_channel(boost_channel_id)
-        if boost_channel:
-            embed = discord.Embed(
-                title="<:boost1:1567489688032256041> New server Boost!",
-                description=(
-                    f"{after.mention} **BOOST!**\n"
-                    f"*thanks for boosting our server!*\n"
-                    f"*Go check out our booster zone!*\n\n"
-                    f"<:boost2:1567489885365997638> **Boost level**\n"
-                    f"<:boost3:1567490142908719155> Server Boost level: `{after.guild.premium_tier}`\n"
-                    f"<:boost4:1567490339907043388> Boost count: `{after.guild.premium_subscription_count}`"
-                ),
-                color=0xf47fff
-            )
-            embed.set_thumbnail(url=after.display_avatar.url)
-            embed.set_image(url="https://cdn.discordapp.com/attachments/1563292364414648471/1567487836897415209/boost.jpg")
-            embed.set_footer(text="SHADERS PROJECT")
-            await boost_channel.send(embed=embed)
+        await channel.send("🔒 Ticket zostanie usunięty za 5 sekund...")
+        await asyncio.sleep(5)
+        await channel.delete()
 
-# --- 3. LEGIT CHECK (Automatyczne czyszczenie i odświeżanie) ---
-@client.event
-async def on_message(message: discord.Message):
-    if message.author.bot:
+
+class TicketControlPanel(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Owner", style=discord.ButtonStyle.danger, custom_id="ticket_btn_owner")
+    async def owner_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await create_ticket(interaction, "owner")
+
+    @discord.ui.button(label="Support", style=discord.ButtonStyle.success, custom_id="ticket_btn_support")
+    async def support_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await create_ticket(interaction, "support")
+
+    @discord.ui.button(label="Shop", style=discord.ButtonStyle.primary, custom_id="ticket_btn_shop")
+    async def shop_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await create_ticket(interaction, "shop")
+
+    @discord.ui.button(label="Partner", style=discord.ButtonStyle.secondary, custom_id="ticket_btn_partner")
+    async def partner_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await create_ticket(interaction, "partner")
+
+
+async def create_ticket(interaction: discord.Interaction, ticket_type: str):
+    guild = interaction.guild
+    user = interaction.user
+    cfg = TICKET_CONFIGS[ticket_type]
+
+    category = guild.get_channel(cfg["category_id"])
+    if not category:
+        await interaction.response.send_message("❌ Błąd: Kategoria ticketów nie istnieje.", ephemeral=True)
         return
-    
-    legit_channel_id = 1566908229081108620
-    if message.channel.id == legit_channel_id:
-        try:
-            async for m in message.channel.history(limit=10):
-                if m.author == client.user:
-                    await m.delete()
-        except Exception:
-            pass
 
-        legit_embed = discord.Embed(
-            title="☑️ JAK WYSTAWIĆ LEGIT CHECK",
-            description=(
-                "[☑️] Kupowałeś coś u nas? Wystaw legit check i wesprzyj renomę serwera!\n"
-                "[ℹ️] Skopiuj poniższy format, uzupełnij dane i wyślij na tym kanale.\n\n"
-                "📋 **WYMAGANY WZÓR**\n"
-                "```+rep @osoba opis transakcji | kwota PLN | metoda```\n\n"
-                "☑️ **PRZYKŁAD**\n"
-                "```+rep @sprzedawca Bulletki | 30 PLN | BLIK```"
-            ),
-            color=0x2b2d31
+    # Ustawianie uprawnień
+    overwrites = {
+        guild.default_role: discord.PermissionOverwrite(read_messages=False),
+        user: discord.PermissionOverwrite(read_messages=True, send_messages=True, attach_files=True),
+        guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True, manage_channels=True)
+    }
+
+    for role_id in cfg["access_roles"]:
+        role = guild.get_role(role_id)
+        if role:
+            overwrites[role] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
+
+    channel_name = f"{ticket_type}-{user.name}"
+    channel = await guild.create_text_channel(
+        name=channel_name,
+        category=category,
+        overwrites=overwrites
+    )
+
+    await interaction.response.send_message(f"✅ Stworzono ticket: {channel.mention}", ephemeral=True)
+
+    # Wiadomość powitalna wewnątrz otwieranego ticketu
+    pings = " ".join([f"<@&{r_id}>" for r_id in cfg["access_roles"]])
+    embed = discord.Embed(
+        description=f"• **{ticket_type.upper()}** {cfg['icon']}\n\n"
+                    f"**Open date:** {datetime.utcnow().strftime('%d %B %Y, %H:%M')}\n"
+                    f"**Opening user:** {user.mention}\n\n"
+                    f"**Description:** Please give us details about your reason to open this ticket.\n"
+                    f"Click the button below to close the ticket.",
+        color=discord.Color.dark_gray()
+    )
+    embed.set_footer(text="Kyro")
+
+    await channel.send(content=f"{pings} {user.mention}", embed=embed, view=CloseTicketView())
+
+# ==========================================
+# EVENTS & COMMANDS
+# ==========================================
+@bot.event
+async def on_ready():
+    print(f"[-] Bot Kyro online: {bot.user}")
+    bot.add_view(TicketControlPanel())
+    bot.add_view(CloseTicketView())
+    try:
+        synced = await bot.tree.sync()
+        print(f"Synced {len(synced)} slash command(s)")
+    except Exception as e:
+        print(f"Failed to sync slash commands: {e}")
+
+# Powitania użytkowników
+@bot.event
+async def on_member_join(member: discord.Member):
+    channel = member.guild.get_channel(WELCOME_CHANNEL_ID)
+    if not channel:
+        return
+
+    # Przygotowanie pól z emotikonami po bokach
+    member_count = member.guild.member_count
+    created_at = member.created_at.strftime("%Y-%m-%d %H:%M:%S")
+    joined_at = member.joined_at.strftime("%Y-%m-%d %H:%M:%S") if member.joined_at else datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+
+    hi_val = f"<{W_EMOJI[0]}> Hi {member.mention} We're glad to have you here! <{W_EMOJI[1]}>\nGo check out our fivem stuff!\nDon't forget to read the rules!\n**You're our {member_count} member!**"
+    user_info_val = f"<{W_EMOJI[2]}> **Discord account created:** `{created_at}` <{W_EMOJI[3]}>\n<{W_EMOJI[4]}> **Username:** `{member.name}` <{W_EMOJI[5]}>\n<{W_EMOJI[0]}> **Joined at:** `{joined_at}` <{W_EMOJI[1]}>"
+
+    embed = discord.Embed(color=discord.Color.dark_gray())
+    embed.add_field(name=" ", value=hi_val, inline=False)
+    embed.add_field(name="📣 User Information", value=user_info_val, inline=False)
+    embed.set_image(url=BANNER_URL)
+    embed.set_footer(text="Kyro")
+
+    # Wymagany duży nagłówek na samej górze
+    await channel.send(content="# New user joined us!", embed=embed)
+
+# Wykrywanie Boostów serwera
+@bot.event
+async def on_member_update(before: discord.Member, after: discord.Member):
+    if not before.premium_since and after.premium_since:
+        channel = after.guild.get_channel(WELCOME_CHANNEL_ID)
+        if not channel:
+            return
+
+        boost_level = after.guild.premium_tier
+        boost_count = after.guild.premium_subscription_count
+
+        boost_val = f"<{B_EMOJI[0]}> {after.mention} **BOOST!** <{B_EMOJI[1]}>\nthanks for boosting our server!\n*Go check out our booster zone!*\n\n" \
+                    f"🚀 **Boost level**\n<{B_EMOJI[2]}> **Server Boost level:** `{boost_level}` <{B_EMOJI[3]}>\n<{B_EMOJI[0]}> **Boost count:** `{boost_count}` <{B_EMOJI[1]}>"
+
+        embed = discord.Embed(title="⬡ New server Boost!", description=boost_val, color=discord.Color.dark_gray())
+        embed.set_thumbnail(url=after.display_avatar.url)
+        embed.set_image(url=BANNER_URL)
+        embed.set_footer(text="Kyro")
+
+        await channel.send(embed=embed)
+
+# Komenda /tickets
+@bot.tree.command(name="tickets", description="Generuje panel ticketów na wyznaczonym kanale")
+async def tickets_cmd(interaction: discord.Interaction):
+    if interaction.channel_id != TICKETS_CMD_CHANNEL_ID:
+        await interaction.response.send_message("❌ Tej komendy możesz użyć tylko na przeznaczonym do tego kanale.", ephemeral=True)
+        return
+
+    target_channel = interaction.guild.get_channel(PANEL_TARGET_CHANNEL_ID)
+    if not target_channel:
+        await interaction.response.send_message("❌ Kanał docelowy dla panelu nie istnieje.", ephemeral=True)
+        return
+
+    embed = discord.Embed(title="Tickets", color=discord.Color.dark_gray())
+    
+    for key, item in TICKET_CONFIGS.items():
+        embed.add_field(
+            name=f"|  {item['label']}",
+            value=f"*{item['desc']}*",
+            inline=False
         )
-        legit_embed.set_image(url="https://cdn.discordapp.com/attachments/1563292364414648471/1567487784665616384/legit_check.jpg")
-        legit_embed.set_footer(text="© SHADERS PROJECT - Zweryfikowane opinie")
-        await message.channel.send(embed=legit_embed)
-    
-    await client.process_commands(message)
 
-# --- WIDOKI PRZYCISKÓW I MENU ---
+    embed.add_field(name="|  For any issues, text on #chat", value="\u200b", inline=False)
+    embed.set_image(url=BANNER_URL)
+    embed.set_footer(text="Kyro")
 
-class InfoView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
+    await target_channel.send(embed=embed, view=TicketControlPanel())
+    await interaction.response.send_message(f"✅ Panel ticketów został wysłany na {target_channel.mention}", ephemeral=True)
 
-    @discord.ui.button(label="Regulamin", style=discord.ButtonStyle.secondary, custom_id="btn_regulamin")
-    async def regulamin_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
-        reg_embed = discord.Embed(
-            title="# REGULAMIN SERWERA SHADERS PROJECT",
-            description=(
-                "- Traktuj wszystkich z szacunkiem. Hejt, nękanie i dyskryminacja są zabronione.\n"
-                "- Zachowuj kulturę wypowiedzi. Dbamy o przyjazną atmosferę, więc choć przeklinanie jest dozwolone, prosimy, by nie było nadmierne.\n"
-                "- Nie promuj innych serwerów, projektów ani usług bez zgody administracji. Nieautoryzowana reklama i spam mogą skutkować ostrzeżeniem, banem lub dodaniem na blacklistę.\n"
-                "- Nie publikuj treści NSFW (materiałów pornograficznych, szokujących czy nieodpowiednich dla społeczności).\n"
-                "- Nie udostępniaj danych osobowych na publicznych kanałach – takich jak adresy, numery telefonu, e-maile, PESEL i podobne.\n\n"
-                "Administracja może reagować na łamanie zasad. W razie pytań zgłoś się na <#1561742350986903702>."
-            ),
-            color=0x2b2d31
-        )
-        await interaction.response.send_message(embed=reg_embed, ephemeral=True)
+# Komenda /bandc
+@bot.tree.command(name="bandc", description="Banuje użytkownika i wysyła zgłoszenie")
+@app_commands.describe(user="Użytkownik do zbanowania", reason="Powód bana")
+async def bandc_cmd(interaction: discord.Interaction, user: discord.Member, reason: str):
+    await interaction.guild.ban(user, reason=reason)
 
-    @discord.ui.button(label="Info Partner", style=discord.ButtonStyle.secondary, custom_id="btn_partner")
-    async def partner_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
-        partner_embed = discord.Embed(
-            title="# WYMAGANIA PARTNERSTWA",
-            description="- 300 osob na serwerze\n- nie może to być shop",
-            color=0x2b2d31
-        )
-        await interaction.response.send_message(embed=partner_embed, ephemeral=True)
+    embed = discord.Embed(title="🔨 User banned permanently", color=discord.Color.red())
+    embed.add_field(name="👤 User", value=user.mention, inline=False)
+    embed.add_field(name="🆔 ID", value=f"`{user.id}`", inline=False)
+    embed.add_field(name="🛡️ Administrator", value=interaction.user.mention, inline=False)
+    embed.add_field(name="📝 Reason", value=f"```\n{reason}\n```", inline=False)
 
+    embed.set_thumbnail(url=BANNER_URL)
+    embed.set_footer(text=f"Kyro Security • {datetime.utcnow().strftime('%d listopada %Y %H:%M')}")
 
-class RekrutacjaView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-
-    @discord.ui.button(label="Media", style=discord.ButtonStyle.primary, custom_id="rekru_media")
-    async def media_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.create_ticket(interaction, "media", 1567494614322122832)
-
-    @discord.ui.button(label="Administracja", style=discord.ButtonStyle.primary, custom_id="rekru_admin")
-    async def admin_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.create_ticket(interaction, "administracja", 1567494915745644636)
-
-    async def create_ticket(self, interaction: discord.Interaction, t_type: str, cat_id: int):
-        guild = interaction.guild
-        category = guild.get_channel(cat_id)
-        
-        overwrites = {
-            guild.default_role: discord.PermissionOverwrite(view_channel=False),
-            interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True),
-            guild.get_role(1540495893399081061): discord.PermissionOverwrite(view_channel=True, send_messages=True),
-            guild.get_role(1540359821323149392): discord.PermissionOverwrite(view_channel=True, send_messages=True)
-        }
-
-        channel = await guild.create_text_channel(
-            name=f"{interaction.user.name}-{t_type}",
-            category=category,
-            overwrites=overwrites
-        )
-        await channel.send(f"Witaj {interaction.user.mention}! Twoje zgłoszenie ({t_type}) zostało otwarte.")
-        await interaction.response.send_message(content=f"Utworzono kanał: {channel.mention}", ephemeral=True)
-
-
-class TicketSelect(discord.ui.Select):
-    def __init__(self):
-        options = [
-            discord.SelectOption(label="Owner", value="ticket_owner", emoji="👑", description="ticket with a matter for the owners"),
-            discord.SelectOption(label="Shop", value="ticket_shop", emoji="🛒", description="Ticket for purchase an item from our store"),
-            discord.SelectOption(label="Support", value="ticket_support", emoji="❓", description="Support ticket for help in our server"),
-            discord.SelectOption(label="Partner", value="ticket_partner", emoji="🤝", description="Ticket for partnership")
-        ]
-        super().__init__(placeholder="Select category", min_values=1, max_values=1, options=options, custom_id="select_ticket")
-
-    async def callback(self, interaction: discord.Interaction):
-        val = self.values[0]
-        guild = interaction.guild
-        
-        cat_map = {
-            "ticket_owner": (1567496735360811049, [1540359821323149392, 1540495893399081061]),
-            "ticket_shop": (1567497043134386226, [1540359821323149392, 1540495893399081061]),
-            "ticket_support": (1567497448379645984, []),
-            "ticket_partner": (1567497662406725673, [])
-        }
-
-        cat_id, role_ids = cat_map.get(val, (None, []))
-        category = guild.get_channel(cat_id)
-
-        overwrites = {
-            guild.default_role: discord.PermissionOverwrite(view_channel=False),
-            interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True)
-        }
-        for r_id in role_ids:
-            role = guild.get_role(r_id)
-            if role:
-                overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
-
-        channel = await guild.create_text_channel(
-            name=f"ticket-{interaction.user.name}",
-            category=category,
-            overwrites=overwrites
-        )
-        await channel.send(f"Witaj {interaction.user.mention}! Opisz swoją sprawę, administracja zaraz odpowie.")
-        await interaction.response.send_message(content=f"Utworzono ticket: {channel.mention}", ephemeral=True)
-
-class TicketView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-        self.add_item(TicketSelect())
-
-
-# --- KOMENDY SLASH ---
-
-@client.tree.command(name="info", description="Wysyła panel informacyjny")
-async def info_cmd(interaction: discord.Interaction):
-    if interaction.channel_id != 1561758533446410251:
-        return await interaction.response.send_message("Tę komendę można użyć tylko na kanale administracyjnym!", ephemeral=True)
-    
-    target_channel = interaction.guild.get_channel(1563293981872488479)
-    embed = discord.Embed(
-        title="ℹ️ INFORMACJE",
-        description=(
-            "📖 **Regulamin serwera** kliknij przycisk **Regulamin**, żeby go zobaczyć\n"
-            "⚙️ **Info Partner** kliknij przycisk **Info Partner**, żeby zobaczyć wymagania partnerstwa"
-        ),
-        color=0x2b2d31
-    )
-    embed.set_image(url="https://cdn.discordapp.com/attachments/1563292364414648471/1567487837324968017/ticket.jpg")
-    await target_channel.send(embed=embed, view=InfoView())
-    await interaction.response.send_message("Wysłano panel informacyjny!", ephemeral=True)
-
-@client.tree.command(name="rekrutacja", description="Wysyła panel rekrutacji")
-async def rekrutacja_cmd(interaction: discord.Interaction):
-    if interaction.channel_id != 1561758533446410251:
-        return await interaction.response.send_message("Tę komendę można użyć tylko na kanale administracyjnym!", ephemeral=True)
-
-    target_channel = interaction.guild.get_channel(1566906802094735481)
-    embed = discord.Embed(
-        title="# REKRUTACJA",
-        description=(
-            "# MEDIA\nwymagania:\n- aktywne konto tik tok\n- regulacja w stawianiu filmikow promujących serwer\n\n"
-            "# ADMINISTRACJA\nwymagania:\n- promowanie serwera\n- udzielanie pomocy użytkownikom serwera"
-        ),
-        color=0x2b2d31
-    )
-    await target_channel.send(embed=embed, view=RekrutacjaView())
-    await interaction.response.send_message("Wysłano panel rekrutacji!", ephemeral=True)
-
-@client.tree.command(name="ticket", description="Wysyła panel ticketów")
-async def ticket_cmd(interaction: discord.Interaction):
-    if interaction.channel_id != 1561758533446410251:
-        return await interaction.response.send_message("Tę komendę można użyć tylko na kanale administracyjnym!", ephemeral=True)
-
-    target_channel = interaction.guild.get_channel(1561742350986903702)
-    embed = discord.Embed(
-        title="Tickets",
-        description=(
-            "**Ticket Owner**\n*Open if you have a demand to the owners*\n\n"
-            "**Ticket Shop**\n*open if you you want to buy something*\n\n"
-            "**Ticket Support**\n*Open if you need any help*\n\n"
-            "**Ticket Partner**\n*Open if you want to collaborate with us*"
-        ),
-        color=0x2b2d31
-    )
-    embed.set_image(url="https://cdn.discordapp.com/attachments/1563292364414648471/1567487837324968017/ticket.jpg")
-    await target_channel.send(embed=embed, view=TicketView())
-    await interaction.response.send_message("Wysłano panel ticketów!", ephemeral=True)
-
-@client.tree.command(name="legit", description="Wysyła instrukcję Legit Check")
-async def legit_cmd(interaction: discord.Interaction):
-    if interaction.channel_id != 1561758533446410251:
-        return await interaction.response.send_message("Tę komendę można użyć tylko na kanale administracyjnym!", ephemeral=True)
-
-    target_channel = interaction.guild.get_channel(1566908229081108620)
-    embed = discord.Embed(
-        title="☑️ JAK WYSTAWIĆ LEGIT CHECK",
-        description=(
-            "[☑️] Kupowałeś coś u nas? Wystaw legit check i wesprzyj renomę serwera!\n"
-            "[ℹ️] Skopiuj poniższy format, uzupełnij dane i wyślij na tym kanale.\n\n"
-            "📋 **WYMAGANY WZÓR**\n"
-            "```+rep @osoba opis transakcji | kwota PLN | metoda```\n\n"
-            "☑️ **PRZYKŁAD**\n"
-            "```+rep @sprzedawca Bulletki | 30 PLN | BLIK```"
-        ),
-        color=0x2b2d31
-    )
-    embed.set_image(url="https://cdn.discordapp.com/attachments/1563292364414648471/1567487784665616384/legit_check.jpg")
-    await target_channel.send(embed=embed)
-    await interaction.response.send_message("Wysłano Legit Check!", ephemeral=True)
-
-@client.tree.command(name="accept", description="Akceptuje podanie gracza")
-@app_commands.describe(gracz="Oznaczenie gracza")
-async def accept_cmd(interaction: discord.Interaction, gracz: discord.Member):
-    result_channel = interaction.guild.get_channel(1566906866691473498)
-    embed = discord.Embed(
-        title="ℹ️ PODANIE",
-        description=f"👤 {gracz.mention}\n📖 Twoje podanie zostało **zaakceptowane**!",
-        color=0x43b581
-    )
-    embed.set_image(url="https://cdn.discordapp.com/attachments/1563292364414648471/1567487783612719115/akcept.jpg")
-    
-    if result_channel:
-        await result_channel.send(embed=embed)
-    await interaction.channel.send(embed=embed)
-    await interaction.response.send_message("Podanie zaakceptowane!", ephemeral=True)
-
-@client.tree.command(name="odrzucone", description="Odrzuca podanie gracza")
-@app_commands.describe(gracz="Oznaczenie gracza")
-async def odrzucone_cmd(interaction: discord.Interaction, gracz: discord.Member):
-    result_channel = interaction.guild.get_channel(1566906866691473498)
-    embed = discord.Embed(
-        title="ℹ️ PODANIE",
-        description=f"👤 {gracz.mention}\n📖 Twoje podanie zostało **odrzucone**.",
-        color=0xf04747
-    )
-    embed.set_image(url="https://cdn.discordapp.com/attachments/1563292364414648471/1567487784099516466/odrzucone.jpg")
-    
-    if result_channel:
-        await result_channel.send(embed=embed)
-    await interaction.channel.send(embed=embed)
-    await interaction.response.send_message("Podanie odrzucone!", ephemeral=True)
-
-@client.tree.command(name="bandc", description="Banuje użytkownika z powiadomieniem")
-@app_commands.describe(gracz="Użytkownik do zbanowania", powod="Powód bana")
-async def bandc_cmd(interaction: discord.Interaction, gracz: discord.Member, powod: str):
-    embed = discord.Embed(
-        title="🔨 User has been banned for life",
-        description=(
-            f"👤 **User**: {gracz.mention}\n"
-            f"🆔 **ID**: `{gracz.id}`\n"
-            f"🛡️ **Administrator**: {interaction.user.mention}\n"
-            f"📝 **Reason**:\n```{powod}```"
-        ),
-        color=0xff0000
-    )
-    embed.set_image(url="https://cdn.discordapp.com/attachments/1563292364414648471/1567487782325067896/ban.jpg")
-    
-    await gracz.ban(reason=powod)
     await interaction.response.send_message(embed=embed)
 
-@client.tree.command(name="unbandc", description="Odbanowuje użytkownika")
-@app_commands.describe(id="ID użytkownika")
-async def unbandc_cmd(interaction: discord.Interaction, id: str):
-    user_id = int(id)
-    user = await client.fetch_user(user_id)
-    await interaction.guild.unban(user)
+# Komenda /unbandc
+@bot.tree.command(name="unbandc", description="Odbanowuje użytkownika")
+@app_commands.describe(user_id="ID użytkownika do odbanowania", reason="Powód odbanowania")
+async def unbandc_cmd(interaction: discord.Interaction, user_id: str, reason: str):
+    user = await bot.fetch_user(int(user_id))
+    await interaction.guild.unban(user, reason=reason)
 
-    embed = discord.Embed(
-        title="🔓 User has been unbanned",
-        description=(
-            f"🆔 **ID**: `{user_id}`\n"
-            f"🛡️ **Administrator**: {interaction.user.mention}"
-        ),
-        color=0x43b581
-    )
-    embed.set_image(url="https://cdn.discordapp.com/attachments/1563292364414648471/1567487782757204009/unban.jpg")
+    embed = discord.Embed(title="🔓 User unbanned", color=discord.Color.green())
+    embed.add_field(name="👤 User", value=f"{user.name} ({user.mention})", inline=False)
+    embed.add_field(name="🆔 ID", value=f"`{user.id}`", inline=False)
+    embed.add_field(name="🛡️ Administrator", value=interaction.user.mention, inline=False)
+    embed.add_field(name="📝 Reason", value=f"```\n{reason}\n```", inline=False)
+
+    embed.set_thumbnail(url=BANNER_URL)
+    embed.set_footer(text=f"Kyro Security • {datetime.utcnow().strftime('%d listopada %Y %H:%M')}")
+
     await interaction.response.send_message(embed=embed)
 
-client.run(os.getenv("DISCORD_TOKEN"))
+# ==========================================
+# MAIN EXECUTION
+# ==========================================
+if __name__ == "__main__":
+    keep_alive()
+    TOKEN = os.environ.get("DISCORD_TOKEN")
+    if TOKEN:
+        bot.run(TOKEN)
+    else:
+        print("❌ Ustaw zmienną środowiskową DISCORD_TOKEN na Render / GitHub Secrets!")
