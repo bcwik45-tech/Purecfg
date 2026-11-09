@@ -1,4 +1,0 @@
-discord.py
-flask
-pillow
-aiohttp
